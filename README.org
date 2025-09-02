@@ -1,0 +1,199 @@
+#+TITLE: ptouch -- CLI for Brother P-Touch Label Writers
+#+AUTHOR: Yoshinari Nomura
+#+EMAIL: nom@quickhack.net
+#+DATE: 2025-09-01
+#+OPTIONS: H:3 num:nil toc:nil
+#+OPTIONS: ^:nil \n:nil ::t |:t f:t tex:t
+#+OPTIONS: d:nil tags:t
+#+OPTIONS: author:t email:nil creator:nil
+#+OPTIONS: timestamp:nil timestamps:nil
+#+LANGUAGE: en
+
+[[file:README-ja.org][日本語(Japanese)]]
+
+* What is ptouch?
+  ptouch is a CLI tool for Brother P-TOUCH label writers written in Rust, with the following features:
+
+  You can get the latest version from:
+  https://github.com/yoshinari-nomura/ptouch
+
+  + Creation of tape images including QR codes
+    + QR codes are based on SVG paths, so they don't get distorted even scaled
+  + Supports PNG/SVG output for tape images
+    + I know you want to adjust SVG in an editor
+  + Flexible layout adjustments including rotation, multi columns, auto-scaling
+  + Supports both USB and TCP connections
+  + Supports continuous output without cutting
+    + I don't want to waste tape.
+
+  Confirmed on Linux, but it should build on macOS and Windows as well.
+
+* Supported Printer Models
+  | Model     | Status    | USB vid:pid | Comment                       |
+  |-----------+-----------+-------------+-------------------------------|
+  | PT-P900W  | Confirmed | 04f9:2085   | Wi-Fi/USB operation confirmed |
+  | PT-P900   | Maybe     | 04f9:2083   |                               |
+  | PT-P950NW | Maybe     | 04f9:2086   |                               |
+  | PT-2430PC | Not yet   | 04f9:202d   | Same commands but 180DPI      |
+
+  + PT-2430PC (USB only model) has the same USB command set as the PT-P900 series,
+    but its engine is 180DPI compared to the 360DPI of other models, so it's not yet
+    supported. However, it could be supported with a small modification.
+
+* Usage
+  + ptouch -h
+    #+begin_example
+      Usage: ptouch <COMMAND>
+      Commands:
+        image       Create label image for Brother P-Touch
+        print       Send raster image to P-Touch (TCP/USB)
+        status      Get status information from P-Touch
+        completion  Generate shell completion scripts
+    #+end_example
+
+  + ptouch image -h (see --help for details)
+    #+begin_example
+      Usage: ptouch image [OPTIONS] [TEXT]...
+      - Create label image for Brother P-Touch
+
+      Arguments:
+        [TEXT]...  Text lines to print [default: stdin]
+
+      Options:
+        -a, --auto-scale                 Auto scale contents to the tape width
+        -d, --debug                      Show alignment marks for debug
+        -f, --font <FONT>                Font name [default: "Noto Sans CJK JP"]
+        -F, --font-path <FONT_PATH>      Additional font path
+        -l, --line-height <LINE_HEIGHT>  Line height in pixels [default: font-size]
+        -o, --output <OUTPUT>            Output to file [default: stdout]
+        -p, --placement <PLACEMENT>      Place contents [default: top]
+        -r, --rotate                     Rotate image by 90 degrees
+        -s, --font-size <FONT_SIZE>      Font size in pixels [default: 24]
+        -t, --tape-name <TAPE_NAME>      Tape size in mm [default: 12]
+        -S, --source                     Output SVG source instead of PNG
+        -h, --help                       Print help (see more with '--help')
+    #+end_example
+
+  + ptouch print -h (see --help for details)
+    #+begin_example
+      Usage: ptouch print [OPTIONS] --host <HOST> [PNG_FILE]
+      - Send raster image to P-Touch
+
+      Arguments:
+        [PNG_FILE]  PNG file to print [default: stdin]
+
+      Options:
+        -H, --host <HOST>  Printer host: hostname.local (network) or vid:pid (USB)
+                           Examples: ptouch.local, 192.168.1.100, 04f9:2085
+        -c, --continuous   Enable continuous printing (no cutting)
+        -h, --help         Print help
+    #+end_example
+
+  + ptouch status -h (see --help for details)
+    #+begin_example
+      Usage: ptouch status [OPTIONS] --host <HOST>
+      - Get status information from P-Touch
+
+      Options:
+        -H, --host <HOST>  Printer host: hostname.local (network) or vid:pid (USB)
+                           Examples: ptouch.local, 192.168.1.100, 04f9:2085
+        -v, --verbose      Show verbose information
+        -h, --help         Print help
+    #+end_example
+
+    + Network version of status command uses SNMP (UDP 161). Please do not disable SNMP on the P-Touch.
+
+* Format and Output Examples of ptouch image Command
+** Basics
+   + Create tape images in the format: ptouch image "element1" "element2" "element3" ...
+   + Each argument (or each line when using stdin) is treated as an element, and consecutive elements are laid out vertically
+     #+begin_src bash :results silent
+       ptouch image -s 70 -p center -o images/vertical.png "Hello" "World"
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/vertical.png]]
+
+   + Separating with =+= creates horizontal layout (ROW creation)
+     #+begin_src bash :results silent
+       ptouch image -s 50 -p center -o images/horizontal.png "qrc:Hello World" + "Hello" "World"
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/horizontal.png]]
+
+** Types of Elements
+   Elements are strings with the following prefixes:
+   + =txt:= prefix (txt: can be omitted): Text element
+   + =qrc:= prefix: QR code element
+   + =bar:= prefix: Barcode element (not implemented)
+   + =img:= prefix: Image element (not implemented)
+
+** Layout Examples
+*** Basic Text Placement (top, bottom, center, auto-scale)
+    + In the following examples, the =-d= option is used to visualize non-printable areas and bounding boxes.
+      For actual printing images, you need to create without the =-d= option.
+    + Tape width and font size are the defaults: 12mm (-t 12) and 24px (-f 24).
+    + Default values for each option can be checked with =ptouch image --help=.
+
+    + top
+      #+begin_src bash :results silent
+        ptouch image -d -s 70 -o images/hello-t.png "Hello - Top"
+      #+end_src
+      #+ATTR_HTML: :height 85px
+      [[file:images/hello-t.png]]
+
+    + bottom
+      #+begin_src bash :results silent
+        ptouch image -d -p bottom -s 70 -o images/hello-b.png "Hello - Bottom"
+      #+end_src
+      #+ATTR_HTML: :height 85px
+      [[file:images/hello-b.png]]
+
+    + center
+      #+begin_src bash :results silent
+        ptouch image -d -p center -s 70 -o images/hello-c.png "Hello - Center"
+      #+end_src
+      #+ATTR_HTML: :height 85px
+      [[file:images/hello-c.png]]
+
+    + auto-scale: Automatically scales to fit the full tape width
+      #+begin_src bash :results silent
+        ptouch image -d -a -o images/hello-a.png "Hello - Scaled"
+      #+end_src
+      #+ATTR_HTML: :height 85px
+      [[file:images/hello-a.png]]
+
+*** Rotated Layout Using Wide Tape
+    + Rotated 90 degrees with =-r= and placed to fit the full tape width with =-a=.
+    #+begin_src bash :results silent
+      ptouch image -d -a -r -p center -s 50 -o images/qr-hello-world-a-r.png \
+        "qrc:Hello World" + "Hello World"
+    #+end_src
+    #+ATTR_HTML: :height 255px
+    [[file:images/qr-hello-world-a-r.png]]
+
+*** PCB Connector Example
+    Line height is set to connector pitch (0.1 inch) with =-l 36=.
+    #+begin_src bash :results silent
+      ptouch image -d -r -p bottom -l 36 -o images/pcb-connector-r.png \
+        "+5V" "SIN" "GND" "SBUSY" "SCK" "RESET"
+    #+end_src
+
+    #+ATTR_HTML: :height 85px
+    [[file:images/pcb-connector-r.png]]
+
+* Installation
+  #+begin_src bash
+    git clone https://github.com/yoshinari-nomura/ptouch.git
+    cd ptouch
+    cargo build --release
+    cp -p ./target/release/ptouch ~/bin
+  #+end_src
+
+* References
+  + Raster Command Reference PT-P900/P900W/P950NW
+    + English version: https://download.brother.com/welcome/docp100407/cv_ptp900_eng_raster_102.pdf
+    + Japanese version: https://download.brother.com/welcome/docp100407/cv_ptp900_jpn_raster_102.pdf
+
+* Similar Tools
+  + [[https://github.com/masatomizuta/py-brotherlabel][py-brotherlabel: Raster print package for Brother P-Touch label printers]]
+  + [[https://github.com/HenrikBengtsson/brother-ptouch-label-printer-on-linux][HenrikBengtsson/brother-ptouch-label-printer-on-linux: How to print to a Brother P-touch (PT) label printer on Linux]]

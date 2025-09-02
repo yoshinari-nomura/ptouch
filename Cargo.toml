@@ -1,0 +1,16 @@
+[package]
+name = "ptouch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
+clap_complete = { version = "4.5", features = ["unstable-dynamic"] }
+fontdb = "0.23.0"
+png = "0.17.16"
+qrcode = { version = "0.14", default-features = false }
+resvg = "0.45.1"
+rusb = "0.9"
+snmp2 = "0.4"
+svg = "0.18.0"
+tiff = "0.10.0"

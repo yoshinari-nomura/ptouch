@@ -1,0 +1,28 @@
+# Brother P-Touch Label Printer udev rules
+# This file allows non-root users to access Brother P-Touch printers via USB
+#
+# Installation:
+# sudo cp etc/udev/rules.d/99-brother-ptouch.rules /etc/udev/rules.d/
+# sudo udevadm control --reload
+# sudo udevadm trigger
+#
+# Make sure your user is in the 'plugdev' group:
+# sudo usermod -a -G plugdev $USER
+# newgrp plugdev # (or log out and log back in)
+
+# Brother PT-P900 (Product ID: 2083)
+SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="2083", MODE="0666", GROUP="plugdev"
+
+# Brother PT-P900W (Product ID: 2085)
+SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="2085", MODE="0666", GROUP="plugdev"
+
+# Brother PT-P950NW (Product ID: 2086)
+SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="2086", MODE="0666", GROUP="plugdev"
+
+# Brother PT-2430PC (Product ID: 202d)
+SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="202d", MODE="0666", GROUP="plugdev"
+
+# If you want add more Brother P-Touch models:
+# Find your printer's product ID with: lsusb | grep Brother
+# Example:
+# SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="XXXX", MODE="0666", GROUP="plugdev"
