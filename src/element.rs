@@ -146,6 +146,7 @@ fn create_text_element(
         .set("font-size", font_size)
         .set("fill", "black")
         .set("text-anchor", "start")
+        .set("xml:space", "preserve")
         .set("y", 0);
 
     // Use larger dy for first line to ensure positive bbox coordinates
