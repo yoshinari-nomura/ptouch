@@ -40,7 +40,7 @@ impl<B: Backend> Printer<B> {
                 raster_count,
                 PageType::LastPage,
             )
-            .various_mode_settings(true, false) // auto_cut=true, mirror=false
+            .various_mode_settings(!continuous, false) // auto_cut=true if !continuous, mirror=false
             .specify_page_number(1) // always 1 for single page
             .advanced_mode_settings(
                 false,       // draft
