@@ -2,8 +2,8 @@ use fontdb::Database;
 use qrcode;
 use resvg::{tiny_skia, usvg};
 use std::sync::Arc;
-use svg::node::element;
 use svg::Node;
+use svg::node::element;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum VerticalAlign {

@@ -1,6 +1,6 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_complete::engine::ArgValueCompleter;
-use clap_complete::{generate, CompleteEnv, CompletionCandidate};
+use clap_complete::{CompleteEnv, CompletionCandidate, generate};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
