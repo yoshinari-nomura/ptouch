@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::tape::TapeSpec;
 use png::ColorType;
 
@@ -7,10 +8,7 @@ pub struct PrintableImage {
 }
 
 impl PrintableImage {
-    pub fn from_png_data(
-        png_data: Vec<u8>,
-        tape_spec: TapeSpec,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_png_data(png_data: Vec<u8>, tape_spec: TapeSpec) -> Result<Self> {
         // Validate PNG dimensions match tape width
         let decoder = png::Decoder::new(png_data.as_slice());
         let reader = decoder.read_info()?;
@@ -31,7 +29,7 @@ impl PrintableImage {
         })
     }
 
-    pub fn to_raster_lines(&self) -> Result<Vec<Vec<u8>>, Box<dyn std::error::Error>> {
+    pub fn to_raster_lines(&self) -> Result<Vec<Vec<u8>>> {
         png_to_raster_lines(&self.png_data, &self.tape_spec)
     }
 
@@ -40,10 +38,7 @@ impl PrintableImage {
     }
 }
 
-pub fn png_to_raster_lines(
-    png_data: &[u8],
-    tape_spec: &TapeSpec,
-) -> Result<Vec<Vec<u8>>, Box<dyn std::error::Error>> {
+fn png_to_raster_lines(png_data: &[u8], tape_spec: &TapeSpec) -> Result<Vec<Vec<u8>>> {
     let decoder = png::Decoder::new(png_data);
     let mut reader = decoder.read_info()?;
     let mut buf = vec![0; reader.output_buffer_size()];
@@ -87,10 +82,7 @@ pub fn png_to_raster_lines(
     Ok(raster_lines)
 }
 
-fn convert_to_grayscale(
-    buf: &[u8],
-    color_type: ColorType,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn convert_to_grayscale(buf: &[u8], color_type: ColorType) -> Result<Vec<u8>> {
     match color_type {
         ColorType::Grayscale => Ok(buf.to_vec()),
         ColorType::Rgb => Ok(buf
@@ -140,7 +132,7 @@ fn take_literal_run(data: &[u8]) -> &[u8] {
     &data[..len]
 }
 
-pub fn compress_tiff_group4(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn compress_tiff_group4(data: &[u8]) -> Result<Vec<u8>> {
     // TIFF Group 4 Run Length Encoding for Brother P-Touch
     // Based on cv_ptp900_eng_raster_102.pdf "Select compression mode" example:
     // - Run data (consecutive same bytes): negative count (two's complement) + byte

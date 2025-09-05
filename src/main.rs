@@ -12,7 +12,7 @@ use ptouch::layout;
 use ptouch::printable_image::PrintableImage;
 use ptouch::printer::Printer;
 use ptouch::tape::{self, TapeSpec};
-use ptouch::{get_font_names, load_fontdb_with_paths, unescape_shell_string};
+use ptouch::{Result, get_font_names, load_fontdb_with_paths, unescape_shell_string};
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
 #[clap(rename_all = "lowercase")]
@@ -216,7 +216,7 @@ struct CompletionArgs {
     shell: clap_complete::Shell,
 }
 
-fn handle_image_command(args: ImageArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_image_command(args: ImageArgs) -> Result<()> {
     // Get text input
     let texts = if args.text.is_empty() {
         let mut input = String::new();
@@ -288,7 +288,7 @@ fn handle_image_command(args: ImageArgs) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn handle_print_command(args: PrintArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_print_command(args: PrintArgs) -> Result<()> {
     // Read PNG data
     let png_data = match &args.png_file {
         Some(path) => std::fs::read(path)?,
@@ -346,7 +346,7 @@ fn handle_print_command(args: PrintArgs) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn handle_status_command(args: StatusArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_status_command(args: StatusArgs) -> Result<()> {
     let backend = backend::from_host(&args.host)?;
     let mut printer = Printer::new(backend);
 
@@ -362,7 +362,7 @@ fn handle_status_command(args: StatusArgs) -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-fn handle_completion_command(args: CompletionArgs) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_completion_command(args: CompletionArgs) -> Result<()> {
     match args.shell {
         clap_complete::Shell::Zsh => {
             // Generate dynamic completion script for zsh using CompleteEnv
@@ -459,7 +459,7 @@ fn font_completer(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
     completions
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     // Check for dynamic completion first
     CompleteEnv::with_factory(Cli::command).complete();
 

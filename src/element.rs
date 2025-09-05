@@ -1,9 +1,9 @@
+use crate::Result;
 use fontdb::Database;
 use qrcode;
 use resvg::{tiny_skia, usvg};
 use std::sync::Arc;
-use svg::Node;
-use svg::node::element;
+use svg::node::element as svge;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum VerticalAlign {
@@ -65,27 +65,27 @@ impl std::fmt::Display for BoundingBox {
 }
 
 /// Helper function to wrap a single element in a group
-fn enclose_group(node: impl Into<Box<dyn Node>>) -> element::Group {
-    element::Group::new().add(node)
+fn enclose_group(node: impl Into<Box<dyn svg::Node>>) -> svge::Group {
+    svge::Group::new().add(node)
 }
 
 /// Common interface for all renderable elements in the layout system
 pub trait Element {
     /// Calculate the bounding box of this element
-    fn bounding_box(&self) -> Result<BoundingBox, Box<dyn std::error::Error>>;
+    fn bounding_box(&self) -> Result<BoundingBox>;
 
     /// Render this element as an SVG Group
-    fn render(&self) -> Result<element::Group, Box<dyn std::error::Error>>;
+    fn render(&self) -> Result<svge::Group>;
 
     /// Render this element at a specific position with proper coordinate transformation
-    fn render_at(&self, x: f32, y: f32) -> Result<element::Group, Box<dyn std::error::Error>> {
+    fn render_at(&self, x: f32, y: f32) -> Result<svge::Group> {
         let bbox = self.bounding_box()?;
         let group = self.render()?;
 
         // Combine bbox correction (-bbox.x, -bbox.y) and position placement (x, y)
-        let transform = format!("translate({}, {})", x - bbox.x, y - bbox.y);
+        let tr = format!("translate({}, {})", x - bbox.x, y - bbox.y);
 
-        Ok(group.set("transform", transform))
+        Ok(group.set("transform", tr))
     }
 }
 
@@ -103,7 +103,7 @@ pub struct Text {
 }
 
 impl Text {
-    pub fn new(texts: &[String], options: TextOptions) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(texts: &[String], options: TextOptions) -> Result<Self> {
         validate_font(&options.font_name, &options.fontdb)?;
 
         Ok(Text {
@@ -114,7 +114,7 @@ impl Text {
 }
 
 impl Element for Text {
-    fn bounding_box(&self) -> Result<BoundingBox, Box<dyn std::error::Error>> {
+    fn bounding_box(&self) -> Result<BoundingBox> {
         calculate_text_bbox(
             &self.options.font_name,
             self.options.font_size,
@@ -124,7 +124,7 @@ impl Element for Text {
         )
     }
 
-    fn render(&self) -> Result<element::Group, Box<dyn std::error::Error>> {
+    fn render(&self) -> Result<svge::Group> {
         let text_element = create_text_element(
             &self.options.font_name,
             self.options.font_size,
@@ -140,8 +140,8 @@ fn create_text_element(
     font_size: u32,
     line_height: u32,
     texts: &[String],
-) -> element::Text {
-    let mut text = element::Text::new("")
+) -> svge::Text {
+    let mut text = svge::Text::new("")
         .set("font-family", font_name)
         .set("font-size", font_size)
         .set("fill", "black")
@@ -152,7 +152,7 @@ fn create_text_element(
     // Use larger dy for first line to ensure positive bbox coordinates
     let mut dy = font_size * 2; // Double the font size for first line
     for line in texts {
-        let tspan = element::TSpan::new(line.clone()).set("x", 0).set("dy", dy);
+        let tspan = svge::TSpan::new(line.clone()).set("x", 0).set("dy", dy);
         text = text.add(tspan);
         dy = line_height; // Subsequent lines use normal line height
     }
@@ -160,7 +160,7 @@ fn create_text_element(
     text
 }
 
-fn validate_font(font_name: &str, fontdb: &Database) -> Result<(), Box<dyn std::error::Error>> {
+fn validate_font(font_name: &str, fontdb: &Database) -> Result<()> {
     // Check if the specified font family exists in the database
     let font_found = fontdb.faces().any(|face| {
         face.families
@@ -181,7 +181,7 @@ fn calculate_text_bbox(
     line_height: u32,
     texts: &[String],
     fontdb: &Arc<Database>,
-) -> Result<BoundingBox, Box<dyn std::error::Error>> {
+) -> Result<BoundingBox> {
     // Create a temporary SVG for pre-rendering
     let max_line_length = texts.iter().map(|s| s.chars().count()).max().unwrap_or(0);
     let line_count = texts.len();
@@ -189,35 +189,30 @@ fn calculate_text_bbox(
     let vw = max_line_length * font_size as usize + 500;
     let vh = line_count * font_size as usize + 500;
 
-    let text_element = create_text_element(font_name, font_size, line_height, texts);
-
-    let document = svg::Document::new()
+    let txt = create_text_element(font_name, font_size, line_height, texts);
+    let doc = svg::Document::new()
         .set("viewBox", (0, 0, vw, vh))
         .set("xmlns", "http://www.w3.org/2000/svg")
-        .add(text_element);
-
-    let svg_data = document.to_string();
+        .add(txt);
+    let svg = doc.to_string();
 
     // Use pixel-based bounding box calculation
-    let result = calculate_pixel_bbox(&svg_data, fontdb)?;
+    let result = calculate_pixel_bbox(&svg, fontdb)?;
 
     Ok(result)
 }
 
-pub fn render_svg_to_pixmap(
-    svg_data: &str,
-    fontdb: &Arc<Database>,
-) -> Result<tiny_skia::Pixmap, Box<dyn std::error::Error>> {
+pub fn render_svg_to_pixmap(svg_data: &str, fontdb: &Arc<Database>) -> Result<tiny_skia::Pixmap> {
     let options = usvg::Options {
         fontdb: fontdb.clone(),
         ..Default::default()
     };
 
     let tree = usvg::Tree::from_str(svg_data, &options)?;
-    let svg_size = tree.size().to_int_size();
+    let size = tree.size().to_int_size();
 
-    let mut pixmap = tiny_skia::Pixmap::new(svg_size.width(), svg_size.height())
-        .ok_or("Failed to create pixmap")?;
+    let mut pixmap =
+        tiny_skia::Pixmap::new(size.width(), size.height()).ok_or("Failed to create pixmap")?;
 
     // Render SVG to pixmap
     resvg::render(
@@ -229,10 +224,7 @@ pub fn render_svg_to_pixmap(
     Ok(pixmap)
 }
 
-fn calculate_pixel_bbox(
-    svg_data: &str,
-    fontdb: &Arc<Database>,
-) -> Result<BoundingBox, Box<dyn std::error::Error>> {
+fn calculate_pixel_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<BoundingBox> {
     // Use shared rendering logic
     let pixmap = render_svg_to_pixmap(svg_data, fontdb)?;
 
@@ -292,7 +284,7 @@ pub struct QrCode {
 }
 
 impl QrCode {
-    pub fn new(data: String) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(data: String) -> Result<Self> {
         // Validate that the data can be encoded as QR code
         qrcode::QrCode::new(&data)?;
 
@@ -303,10 +295,10 @@ impl QrCode {
     }
 
     /// Compact version of render with optimized path data
-    fn render_compact(&self) -> Result<Box<dyn Node>, Box<dyn std::error::Error>> {
-        let qr_code = qrcode::QrCode::new(&self.data)?;
-        let modules = qr_code.to_colors();
-        let width = qr_code.width();
+    fn render_compact(&self) -> Result<Box<dyn svg::Node>> {
+        let qr = qrcode::QrCode::new(&self.data)?;
+        let modules = qr.to_colors();
+        let width = qr.width();
 
         let mut path_data = String::new();
 
@@ -346,7 +338,7 @@ impl QrCode {
             }
         }
 
-        let path = element::Path::new()
+        let path = svge::Path::new()
             .set("d", path_data)
             .set("fill", "black")
             .set("fill-rule", "evenodd");
@@ -367,47 +359,47 @@ impl Row {
 }
 
 impl Element for Row {
-    fn bounding_box(&self) -> Result<BoundingBox, Box<dyn std::error::Error>> {
+    fn bounding_box(&self) -> Result<BoundingBox> {
         if self.elements.is_empty() {
             return Ok(BoundingBox::default());
         }
 
-        let padding_box = BoundingBox::new(self.options.padding, 0.0, 0.0, 0.0);
+        let padding = BoundingBox::new(self.options.padding, 0.0, 0.0, 0.0);
         let mut combined = BoundingBox::default();
         let mut first = true;
 
-        for element in &self.elements {
+        for elm in &self.elements {
             if !first {
-                combined = combined.h_append(padding_box);
+                combined = combined.h_append(padding);
             }
             first = false;
-            let bbox = element.bounding_box()?;
+            let bbox = elm.bounding_box()?;
             combined = combined.h_append(bbox);
         }
 
         Ok(combined)
     }
 
-    fn render(&self) -> Result<element::Group, Box<dyn std::error::Error>> {
-        let mut group = element::Group::new();
-        let mut current_x = 0.0;
+    fn render(&self) -> Result<svge::Group> {
+        let mut group = svge::Group::new();
+        let mut x = 0.0;
 
         // Get maximum height from our own bounding box
-        let row_height = self.bounding_box()?.height;
+        let height = self.bounding_box()?.height;
 
-        for element in &self.elements {
-            let element_bbox = element.bounding_box()?;
+        for elm in &self.elements {
+            let bbox = elm.bounding_box()?;
 
             // Calculate Y offset based on alignment
-            let y_offset = match self.options.align {
+            let y = match self.options.align {
                 VerticalAlign::Top => 0.0,
-                VerticalAlign::Center => (row_height - element_bbox.height) / 2.0,
-                VerticalAlign::Bottom => row_height - element_bbox.height,
+                VerticalAlign::Center => (height - bbox.height) / 2.0,
+                VerticalAlign::Bottom => height - bbox.height,
             };
 
-            let element_group = element.render_at(current_x, y_offset)?;
-            group = group.add(element_group);
-            current_x += element_bbox.width + self.options.padding;
+            let eg = elm.render_at(x, y)?;
+            group = group.add(eg);
+            x += bbox.width + self.options.padding;
         }
 
         Ok(group)
@@ -426,36 +418,36 @@ impl Column {
 }
 
 impl Element for Column {
-    fn bounding_box(&self) -> Result<BoundingBox, Box<dyn std::error::Error>> {
+    fn bounding_box(&self) -> Result<BoundingBox> {
         if self.elements.is_empty() {
             return Ok(BoundingBox::default());
         }
 
-        let padding_box = BoundingBox::new(0.0, self.padding, 0.0, 0.0);
+        let padding = BoundingBox::new(0.0, self.padding, 0.0, 0.0);
         let mut combined = BoundingBox::default();
         let mut first = true;
 
-        for element in &self.elements {
+        for elm in &self.elements {
             if !first {
-                combined = combined.v_append(padding_box);
+                combined = combined.v_append(padding);
             }
             first = false;
-            let bbox = element.bounding_box()?;
+            let bbox = elm.bounding_box()?;
             combined = combined.v_append(bbox);
         }
 
         Ok(combined)
     }
 
-    fn render(&self) -> Result<element::Group, Box<dyn std::error::Error>> {
-        let mut group = element::Group::new();
-        let mut current_y = 0.0;
+    fn render(&self) -> Result<svge::Group> {
+        let mut group = svge::Group::new();
+        let mut y = 0.0;
 
-        for element in &self.elements {
-            let element_bbox = element.bounding_box()?;
-            let element_group = element.render_at(0.0, current_y)?;
-            group = group.add(element_group);
-            current_y += element_bbox.height + self.padding;
+        for elm in &self.elements {
+            let bbox = elm.bounding_box()?;
+            let eg = elm.render_at(0.0, y)?;
+            group = group.add(eg);
+            y += bbox.height + self.padding;
         }
 
         Ok(group)
@@ -463,9 +455,9 @@ impl Element for Column {
 }
 
 impl Element for QrCode {
-    fn bounding_box(&self) -> Result<BoundingBox, Box<dyn std::error::Error>> {
-        let qr_code = qrcode::QrCode::new(&self.data)?;
-        let width = qr_code.width() as f32;
+    fn bounding_box(&self) -> Result<BoundingBox> {
+        let qr = qrcode::QrCode::new(&self.data)?;
+        let width = qr.width() as f32;
         let size = width * self.module_size;
 
         Ok(BoundingBox {
@@ -476,7 +468,7 @@ impl Element for QrCode {
         })
     }
 
-    fn render(&self) -> Result<element::Group, Box<dyn std::error::Error>> {
+    fn render(&self) -> Result<svge::Group> {
         let path = self.render_compact()?;
         Ok(enclose_group(path))
     }

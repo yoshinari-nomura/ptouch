@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::backend::Backend;
 use crate::printable_image::{PrintableImage, compress_tiff_group4};
 use crate::raster_command::{CommandMode, PageType, RasterCommand};
@@ -12,15 +13,11 @@ impl<B: Backend> Printer<B> {
         Printer { backend }
     }
 
-    pub fn get_status(&mut self) -> Result<Status, Box<dyn std::error::Error>> {
+    pub fn get_status(&mut self) -> Result<Status> {
         self.backend.get_status()
     }
 
-    pub fn print(
-        &mut self,
-        printable: &PrintableImage,
-        continuous: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn print(&mut self, printable: &PrintableImage, continuous: bool) -> Result<()> {
         // Convert to raster lines
         let raster_lines = printable.to_raster_lines()?;
         let raster_count = raster_lines.len() as u32;

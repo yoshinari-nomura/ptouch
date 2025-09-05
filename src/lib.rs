@@ -11,6 +11,8 @@ pub mod tape;
 use fontdb::Database;
 use std::path::PathBuf;
 
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 /// Remove shell escaping from a string
 ///
 /// Handles common escape sequences: `\<space>`, `\<tab>`, `\<newline>`, `\\`, `\'`, `\"`
@@ -93,9 +95,7 @@ pub fn unescape_shell_string(s: &str) -> String {
 ///
 /// # Returns
 /// * Result containing Arc<Database> or error
-pub fn load_fontdb_with_paths(
-    font_paths: &[PathBuf],
-) -> Result<std::sync::Arc<Database>, Box<dyn std::error::Error>> {
+pub fn load_fontdb_with_paths(font_paths: &[PathBuf]) -> Result<std::sync::Arc<Database>> {
     let mut fontdb = Database::new();
     fontdb.load_system_fonts();
 

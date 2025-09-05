@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::element::{Element, render_svg_to_pixmap};
 use crate::tape::TapeSpec;
 use fontdb::Database;
@@ -45,19 +46,19 @@ impl Label {
     }
 
     /// Create SVG document
-    pub fn to_svg(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn to_svg(&self) -> Result<String> {
         create_label_svg_from_element(&*self.element, &self.options)
     }
 
     /// Create PNG data
-    pub fn to_png(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub fn to_png(&self) -> Result<Vec<u8>> {
         let svg_data = self.to_svg()?;
         let pixmap = render_svg_to_pixmap(&svg_data, &self.options.fontdb)?;
         Ok(pixmap.encode_png()?)
     }
 
     /// Save SVG file
-    pub fn save_svg<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_svg<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let svg_data = self.to_svg()?;
         let mut file = File::create(path)?;
         file.write_all(svg_data.as_bytes())?;
@@ -65,7 +66,7 @@ impl Label {
     }
 
     /// Save PNG file
-    pub fn save_png<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_png<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let png_data = self.to_png()?;
         let mut file = File::create(path)?;
         file.write_all(&png_data)?;
@@ -78,10 +79,7 @@ impl Label {
     }
 }
 
-fn create_label_svg_from_element(
-    element: &dyn Element,
-    options: &LabelOptions,
-) -> Result<String, Box<dyn std::error::Error>> {
+fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) -> Result<String> {
     let tape = &options.tape_spec;
 
     // Elementからbounding_boxを取得

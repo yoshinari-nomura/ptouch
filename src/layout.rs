@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::element::{Column, Element, QrCode, Row, RowOptions, Text, TextOptions};
 
 /// Parse layout script DSL into Element tree
@@ -34,7 +35,7 @@ pub fn parse_layout_script(
     script: &[String],
     text_options: &TextOptions,
     row_options: &RowOptions,
-) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn Element>> {
     if script.is_empty() {
         return Err("Empty layout script".into());
     }
@@ -91,7 +92,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 /// Parse ROW := COLUMN ("+" COLUMN)*
-fn parse_row(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+fn parse_row(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     let mut columns = Vec::new();
 
     // Parse first column
@@ -108,7 +109,7 @@ fn parse_row(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>, Box<dyn std:
 }
 
 /// Parse COLUMN := ELEMENT+
-fn parse_column(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+fn parse_column(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     let mut elements = Vec::new();
 
     while let Some(element) = parse_element(tokenizer)? {
@@ -123,9 +124,7 @@ fn parse_column(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>, Box<dyn s
 }
 
 /// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | TXT_ELEMENT
-fn parse_element(
-    tokenizer: &mut Tokenizer,
-) -> Result<Option<Box<dyn Element>>, Box<dyn std::error::Error>> {
+fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     if let Some(token) = tokenizer.peek() {
         if let Some(content) = token.strip_prefix("bar:") {
             let content = content.to_string();
@@ -153,9 +152,7 @@ fn parse_element(
 }
 
 /// Parse TXT_ELEMENT := ("txt:" STRING | STRING)+
-fn parse_txt_element(
-    tokenizer: &mut Tokenizer,
-) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     let mut texts = Vec::new();
 
     while let Some(token) = tokenizer.peek() {
@@ -187,7 +184,7 @@ fn parse_txt_element(
 fn create_row_element(
     columns: Vec<Box<dyn Element>>,
     row_options: RowOptions,
-) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn Element>> {
     let mut columns = columns;
     match columns.len() {
         0 => Err("No columns found".into()),
@@ -197,9 +194,7 @@ fn create_row_element(
 }
 
 /// Create Column element or return single element if elements.len() == 1
-fn create_column_element(
-    elements: Vec<Box<dyn Element>>,
-) -> Result<Box<dyn Element>, Box<dyn std::error::Error>> {
+fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Element>> {
     let mut elements = elements;
     match elements.len() {
         0 => Err("No elements found".into()),

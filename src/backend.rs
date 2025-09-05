@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::raster_command::RasterCommand;
 use crate::status::Status;
 use snmp2::{SyncSession, Value};
@@ -6,16 +7,16 @@ use std::net::TcpStream;
 use std::time::Duration;
 
 pub trait Backend {
-    fn send_command(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
-    fn get_status(&mut self) -> Result<Status, Box<dyn std::error::Error>>;
+    fn send_command(&mut self, data: &[u8]) -> Result<()>;
+    fn get_status(&mut self) -> Result<Status>;
 }
 
 impl Backend for Box<dyn Backend> {
-    fn send_command(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    fn send_command(&mut self, data: &[u8]) -> Result<()> {
         (**self).send_command(data)
     }
 
-    fn get_status(&mut self) -> Result<Status, Box<dyn std::error::Error>> {
+    fn get_status(&mut self) -> Result<Status> {
         (**self).get_status()
     }
 }
@@ -26,7 +27,7 @@ pub struct NetworkBackend {
 }
 
 impl NetworkBackend {
-    pub fn new(host: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(host: &str) -> Result<Self> {
         // Default to port 9100 for P-Touch printers
         let address = if host.contains(':') {
             host.to_string()
@@ -45,13 +46,13 @@ impl NetworkBackend {
 }
 
 impl Backend for NetworkBackend {
-    fn send_command(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    fn send_command(&mut self, data: &[u8]) -> Result<()> {
         self.stream.write_all(data)?;
         self.stream.flush()?;
         Ok(())
     }
 
-    fn get_status(&mut self) -> Result<Status, Box<dyn std::error::Error>> {
+    fn get_status(&mut self) -> Result<Status> {
         // Use SNMP to get status from Brother P-Touch printer
         // OID: 1.3.6.1.4.1.2435.3.3.9.1.6.1.0
         let oid = "1.3.6.1.4.1.2435.3.3.9.1.6.1.0"
@@ -103,7 +104,7 @@ pub struct UsbBackend {
 
 impl UsbBackend {
     // device_specifier is in the form of vendor_id:product_id (e.g., "04f9:2085")
-    pub fn new(device_specifier: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(device_specifier: &str) -> Result<Self> {
         let (vendor_id, product_id) =
             if let Some((vendor_str, product_str)) = device_specifier.split_once(':') {
                 let vendor = u16::from_str_radix(vendor_str.trim_start_matches("0x"), 16)?;
@@ -182,7 +183,7 @@ impl UsbBackend {
 }
 
 impl Backend for UsbBackend {
-    fn send_command(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    fn send_command(&mut self, data: &[u8]) -> Result<()> {
         let bytes_written = self
             .device
             .write_bulk(self.endpoint_out, data, self.timeout)?;
@@ -202,7 +203,7 @@ impl Backend for UsbBackend {
         Ok(())
     }
 
-    fn get_status(&mut self) -> Result<Status, Box<dyn std::error::Error>> {
+    fn get_status(&mut self) -> Result<Status> {
         // Send status information request via USB
         let mut cmd = RasterCommand::new();
         cmd.invalidate().initialize().status_information_request();
@@ -268,7 +269,7 @@ impl Backend for UsbBackend {
 ///
 /// # Returns
 /// * Backend implementation (NetworkBackend or UsbBackend)
-pub fn from_host(host: &str) -> Result<Box<dyn Backend>, Box<dyn std::error::Error>> {
+pub fn from_host(host: &str) -> Result<Box<dyn Backend>> {
     fn is_usb_specifier(host: &str) -> bool {
         host.contains(':') && host.chars().all(|c| c.is_ascii_hexdigit() || c == ':')
     }
