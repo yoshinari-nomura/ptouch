@@ -2,6 +2,7 @@ use crate::Result;
 use fontdb::Database;
 use qrcode;
 use resvg::{tiny_skia, usvg};
+use std::fmt::{self, Display};
 use std::sync::Arc;
 use svg::node::element as svge;
 
@@ -70,7 +71,7 @@ fn enclose_group(node: impl Into<Box<dyn svg::Node>>) -> svge::Group {
 }
 
 /// Common interface for all renderable elements in the layout system
-pub trait Element {
+pub trait Element: Display {
     /// Calculate the bounding box of this element
     fn bounding_box(&self) -> Result<BoundingBox>;
 
@@ -132,6 +133,12 @@ impl Element for Text {
             &self.texts,
         );
         Ok(enclose_group(text_element))
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Text({})", self.texts.join(","))
     }
 }
 
@@ -406,6 +413,13 @@ impl Element for Row {
     }
 }
 
+impl Display for Row {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let children: Vec<String> = self.elements.iter().map(|e| format!("{}", e)).collect();
+        write!(f, "Row({})", children.join(","))
+    }
+}
+
 pub struct Column {
     elements: Vec<Box<dyn Element>>,
     padding: f32,
@@ -454,6 +468,13 @@ impl Element for Column {
     }
 }
 
+impl Display for Column {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let children: Vec<String> = self.elements.iter().map(|e| format!("{}", e)).collect();
+        write!(f, "Column({})", children.join(","))
+    }
+}
+
 impl Element for QrCode {
     fn bounding_box(&self) -> Result<BoundingBox> {
         let qr = qrcode::QrCode::new(&self.data)?;
@@ -471,5 +492,11 @@ impl Element for QrCode {
     fn render(&self) -> Result<svge::Group> {
         let path = self.render_compact()?;
         Ok(enclose_group(path))
+    }
+}
+
+impl Display for QrCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "QrCode({})", self.data)
     }
 }
