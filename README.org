@@ -131,8 +131,14 @@
    Elements are strings with the following prefixes:
    + =txt:= prefix (txt: can be omitted): Text element
    + =qrc:= prefix: QR code element
+   + =gap:= prefix: Gap element (for layout spacing)
+   + =box:= prefix: Visible Gap element (for thin lines)
    + =bar:= prefix: Barcode element (not implemented)
    + =img:= prefix: Image element (not implemented)
+
+   Gap elements can be used to fine-tune spacing between elements:
+   + =gap:10= : 10x10 square gap
+   + =gap:20x5= : Rectangle gap of width 20, height 5
 
 ** Layout Examples
 *** Basic Text Placement (top, bottom, center, auto-scale)

@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::element::{Column, Element, QrCode, Row, RowOptions, Text, TextOptions};
+use crate::element::{Column, Element, Gap, QrCode, Row, RowOptions, Text, TextOptions};
 
 /// Parse layout script DSL into Element tree
 ///
@@ -7,11 +7,13 @@ use crate::element::{Column, Element, QrCode, Row, RowOptions, Text, TextOptions
 /// - {ROW}     := {COLUMN} ("+" {COLUMN})*
 /// - {COLUMN}  := {FACTOR}+
 /// - {FACTOR}  := {ELEMENT} | "[" {ROW} "]"
-/// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {TXT}
+/// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {GAP} | {BOX} | {TXT}
 ///
 /// - {BAR} := "bar:"{STRING}
 /// - {IMG} := "img:"{STRING}
 /// - {QRC} := "qrc:"{STRING}
+/// - {GAP} := "gap:"{SPEC}
+/// - {BOX} := "box:"{SPEC}
 /// - {TXT} := ("txt:"{STRING} | {STRING})+
 ///
 /// - Prefixes: "txt:", "qrc:", "bar:", "img:" (defaults to "txt:" if no prefix)
@@ -168,7 +170,7 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     }
 }
 
-/// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | TXT_ELEMENT
+/// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | GAP_ELEMENT | BOX_ELEMENT | TXT_ELEMENT
 fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     if let Some(token) = tokenizer.peek() {
         if let Some(content) = token.strip_prefix("bar:") {
@@ -184,6 +186,16 @@ fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> 
             tokenizer.consume();
             let qr_code = QrCode::new(content)?;
             Ok(Some(Box::new(qr_code)))
+        } else if let Some(content) = token.strip_prefix("gap:") {
+            let content = content.to_string();
+            tokenizer.consume();
+            let gap = Gap::parse(&content, false)?;
+            Ok(Some(Box::new(gap)))
+        } else if let Some(content) = token.strip_prefix("box:") {
+            let content = content.to_string();
+            tokenizer.consume();
+            let box_element = Gap::parse(&content, true)?;
+            Ok(Some(Box::new(box_element)))
         } else {
             // Parse TXT_ELEMENT (handles stopping conditions internally)
             parse_txt_element(tokenizer)
@@ -202,6 +214,8 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element
         if token.starts_with("bar:")
             || token.starts_with("img:")
             || token.starts_with("qrc:")
+            || token.starts_with("gap:")
+            || token.starts_with("box:")
             || token == "+"
             || token == "["
             || token == "]"
@@ -246,6 +260,6 @@ fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Elem
     match elements.len() {
         0 => Err("No elements found".into()),
         1 => Ok(elements.pop().unwrap()),
-        _ => Ok(Box::new(Column::new(elements, 5.0))),
+        _ => Ok(Box::new(Column::new(elements, 20.0))),
     }
 }

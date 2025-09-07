@@ -78,6 +78,11 @@ pub trait Element: Display {
     /// Render this element as an SVG Group
     fn render(&self) -> Result<svge::Group>;
 
+    /// Return true if this element is visible (should be rendered)
+    fn is_visible(&self) -> bool {
+        true
+    }
+
     /// Render this element at a specific position with proper coordinate transformation
     fn render_at(&self, x: f32, y: f32) -> Result<svge::Group> {
         let bbox = self.bounding_box()?;
@@ -373,15 +378,20 @@ impl Element for Row {
 
         let padding = BoundingBox::new(self.options.padding, 0.0, 0.0, 0.0);
         let mut combined = BoundingBox::default();
-        let mut first = true;
+        let mut prev_was_visible = false;
 
         for elm in &self.elements {
-            if !first {
+            let bbox = elm.bounding_box()?;
+
+            // Add padding between visible elements
+            if elm.is_visible() && prev_was_visible {
                 combined = combined.h_append(padding);
             }
-            first = false;
-            let bbox = elm.bounding_box()?;
+
             combined = combined.h_append(bbox);
+
+            // Update flag for next iteration
+            prev_was_visible = elm.is_visible();
         }
 
         Ok(combined)
@@ -393,9 +403,15 @@ impl Element for Row {
 
         // Get maximum height from our own bounding box
         let height = self.bounding_box()?.height;
+        let mut prev_was_visible = false;
 
         for elm in &self.elements {
             let bbox = elm.bounding_box()?;
+
+            // Add padding between visible elements
+            if elm.is_visible() && prev_was_visible {
+                x += self.options.padding;
+            }
 
             // Calculate Y offset based on alignment
             let y = match self.options.align {
@@ -404,9 +420,16 @@ impl Element for Row {
                 VerticalAlign::Bottom => height - bbox.height,
             };
 
-            let eg = elm.render_at(x, y)?;
-            group = group.add(eg);
-            x += bbox.width + self.options.padding;
+            // Only render visible elements
+            if elm.is_visible() {
+                let eg = elm.render_at(x, y)?;
+                group = group.add(eg);
+            }
+
+            x += bbox.width;
+
+            // Update flag for next iteration
+            prev_was_visible = elm.is_visible();
         }
 
         Ok(group)
@@ -439,15 +462,20 @@ impl Element for Column {
 
         let padding = BoundingBox::new(0.0, self.padding, 0.0, 0.0);
         let mut combined = BoundingBox::default();
-        let mut first = true;
+        let mut prev_was_visible = false;
 
         for elm in &self.elements {
-            if !first {
+            let bbox = elm.bounding_box()?;
+
+            // Add padding between visible elements
+            if elm.is_visible() && prev_was_visible {
                 combined = combined.v_append(padding);
             }
-            first = false;
-            let bbox = elm.bounding_box()?;
+
             combined = combined.v_append(bbox);
+
+            // Update flag for next iteration
+            prev_was_visible = elm.is_visible();
         }
 
         Ok(combined)
@@ -456,12 +484,26 @@ impl Element for Column {
     fn render(&self) -> Result<svge::Group> {
         let mut group = svge::Group::new();
         let mut y = 0.0;
+        let mut prev_was_visible = false;
 
         for elm in &self.elements {
             let bbox = elm.bounding_box()?;
-            let eg = elm.render_at(0.0, y)?;
-            group = group.add(eg);
-            y += bbox.height + self.padding;
+
+            // Add padding between visible elements
+            if elm.is_visible() && prev_was_visible {
+                y += self.padding;
+            }
+
+            // Only render visible elements
+            if elm.is_visible() {
+                let eg = elm.render_at(0.0, y)?;
+                group = group.add(eg);
+            }
+
+            y += bbox.height;
+
+            // Update flag for next iteration
+            prev_was_visible = elm.is_visible();
         }
 
         Ok(group)
@@ -498,5 +540,81 @@ impl Element for QrCode {
 impl Display for QrCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "QrCode({})", self.data)
+    }
+}
+
+pub struct Gap {
+    width: f32,
+    height: f32,
+    visible: bool,
+}
+
+impl Gap {
+    pub fn new(width: f32, height: f32, visible: bool) -> Self {
+        Gap {
+            width,
+            height,
+            visible,
+        }
+    }
+
+    pub fn parse(spec: &str, visible: bool) -> Result<Self> {
+        if let Some(x) = spec.find('x') {
+            let ws = &spec[..x];
+            let hs = &spec[x + 1..];
+
+            let width: f32 = ws
+                .parse()
+                .map_err(|_| format!("Invalid gap/box spec '{}'", spec))?;
+            let height: f32 = hs
+                .parse()
+                .map_err(|_| format!("Invalid gap/box spec '{}'", spec))?;
+
+            Ok(Gap::new(width, height, visible))
+        } else {
+            // Single number means square gap/box
+            let size: f32 = spec
+                .parse()
+                .map_err(|_| format!("Invalid gap/box spec: {}", spec))?;
+            Ok(Gap::new(size, size, visible))
+        }
+    }
+}
+
+impl Element for Gap {
+    fn bounding_box(&self) -> Result<BoundingBox> {
+        Ok(BoundingBox {
+            width: self.width,
+            height: self.height,
+            x: 0.0,
+            y: 0.0,
+        })
+    }
+
+    fn render(&self) -> Result<svge::Group> {
+        if self.visible {
+            let rect = svge::Rectangle::new()
+                .set("width", self.width)
+                .set("height", self.height)
+                .set("fill", "black");
+            Ok(enclose_group(rect))
+        } else {
+            // Gap is invisible - just empty group
+            Ok(svge::Group::new())
+        }
+    }
+
+    fn is_visible(&self) -> bool {
+        self.visible
+    }
+}
+
+impl Display for Gap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.visible {
+            write!(f, "Box({}x{})", self.width, self.height)
+        } else {
+            write!(f, "Gap({}x{})", self.width, self.height)
+        }
     }
 }

@@ -254,8 +254,9 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     // Create row options from placement
     let row_options = RowOptions {
         align: args.placement.into(),
-        // 14.0 at 360 DPI is 1mm
-        padding: 14.0,
+        // At 360 DPI, 14.0 is 1mm, 20.0 is 1.4mm
+        // Note: This depends on ""quiet zone" of QR code
+        padding: 20.0,
     };
 
     // Create label using layout script parsing
