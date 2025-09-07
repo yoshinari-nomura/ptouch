@@ -4,14 +4,15 @@ use crate::element::{Column, Element, QrCode, Row, RowOptions, Text, TextOptions
 /// Parse layout script DSL into Element tree
 ///
 /// Syntax (BNF):
-/// - {ROW} := {COLUMN} ("+" {COLUMN})*
-/// - {COLUMN} := {ELEMENT}+
-/// - {ELEMENT} :=  {BAR_ELEMENT} | {IMG_ELEMENT} | {QRC_ELEMENT} | {TXT_ELEMENT}
+/// - {ROW}     := {COLUMN} ("+" {COLUMN})*
+/// - {COLUMN}  := {FACTOR}+
+/// - {FACTOR}  := {ELEMENT} | "[" {ROW} "]"
+/// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {TXT}
 ///
-/// - {BAR_ELEMENT} := "bar:"{STRING}
-/// - {IMG_ELEMENT} := "img:"{STRING}
-/// - {QRC_ELEMENT} := "qrc:"{STRING}
-/// - {TXT_ELEMENT} := ("txt:"{STRING} | {STRING})+
+/// - {BAR} := "bar:"{STRING}
+/// - {IMG} := "img:"{STRING}
+/// - {QRC} := "qrc:"{STRING}
+/// - {TXT} := ("txt:"{STRING} | {STRING})+
 ///
 /// - Prefixes: "txt:", "qrc:", "bar:", "img:" (defaults to "txt:" if no prefix)
 /// - "+" separates COLUMN, and layouts columns horizontally (creates ROW)
@@ -19,17 +20,20 @@ use crate::element::{Column, Element, QrCode, Row, RowOptions, Text, TextOptions
 /// - Creating Column or Row only when there are multiple elements to contain
 ///
 /// Examples:
-/// ["Happy", "Birthday"]
+/// Happy Birthday
 /// -> Text(Happy,Birthday)
 ///
-/// ["Happy", "+", "Birthday"]
+/// Happy + Birthday
 /// -> Row(Text(Happy),Text(Birthday))
 ///
-/// ["Hello", "World", "+", "To", "You"]
+/// Hello World + To You
 /// -> Row(Text(Hello,World),Text(To,You))
 ///
-/// ["Happy", "Birthday", "qrc:example.com", "+", "To", "You"]
+/// Happy Birthday qrc:example.com + To You
 /// -> Row(Column(Text(Happy,Birthday),QrCode(example.com)),Text(To,You))
+///
+/// Long-Title-On-Top [ qrc:http://example.com + nom@example.com ]
+/// -> Column(Text(Long-Title-On-Top),Row(QrCode(http://example.com),Text(nom@example.com)))
 ///
 pub fn parse_layout_script(
     script: &[String],
@@ -42,7 +46,14 @@ pub fn parse_layout_script(
 
     let tokens: Vec<&str> = script.iter().map(|s| s.as_str()).collect();
     let mut tokenizer = Tokenizer::new(tokens, text_options, row_options);
-    parse_row(&mut tokenizer)
+    let row = parse_row(&mut tokenizer)?;
+
+    // Check for unconsumed tokens (like unmatched ']')
+    if !tokenizer.is_empty() {
+        return Err(format!("Syntax error at {}", tokenizer.position_info()).into());
+    }
+
+    Ok(row)
 }
 
 /// Tokenizer for layout script DSL
@@ -89,6 +100,22 @@ impl<'a> Tokenizer<'a> {
             false
         }
     }
+
+    fn is_empty(&self) -> bool {
+        self.position >= self.tokens.len()
+    }
+
+    fn position_info(&self) -> String {
+        if self.is_empty() {
+            "End of input".to_string()
+        } else {
+            format!(
+                "Position {}, Token: {}",
+                self.position + 1,
+                self.peek().unwrap()
+            )
+        }
+    }
 }
 
 /// Parse ROW := COLUMN ("+" COLUMN)*
@@ -108,19 +135,37 @@ fn parse_row(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     create_row_element(columns, tokenizer.row_options.clone())
 }
 
-/// Parse COLUMN := ELEMENT+
+/// Parse COLUMN := FACTOR+
 fn parse_column(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
-    let mut elements = Vec::new();
+    let mut factors = Vec::new();
 
-    while let Some(element) = parse_element(tokenizer)? {
-        elements.push(element);
+    while let Some(factor) = parse_factor(tokenizer)? {
+        factors.push(factor);
     }
 
-    if elements.is_empty() {
-        return Err("Empty column".into());
+    if factors.is_empty() {
+        return Err(format!("No COLUMN at {}", tokenizer.position_info()).into());
     }
 
-    create_column_element(elements)
+    create_column_element(factors)
+}
+
+/// Parse FACTOR := ELEMENT | "[" ROW "]"
+fn parse_factor(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
+    if let Some(token) = tokenizer.peek() {
+        if token == "[" {
+            tokenizer.consume(); // consume "["
+            let row = parse_row(tokenizer)?;
+            if !tokenizer.expect("]") {
+                return Err(format!("Expected ']' at {}", tokenizer.position_info()).into());
+            }
+            Ok(Some(row))
+        } else {
+            parse_element(tokenizer)
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 /// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | TXT_ELEMENT
@@ -139,12 +184,9 @@ fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> 
             tokenizer.consume();
             let qr_code = QrCode::new(content)?;
             Ok(Some(Box::new(qr_code)))
-        } else if token == "+" {
-            // Stop parsing elements when we hit "+"
-            Ok(None)
         } else {
-            // Parse TXT_ELEMENT
-            parse_txt_element(tokenizer).map(Some)
+            // Parse TXT_ELEMENT (handles stopping conditions internally)
+            parse_txt_element(tokenizer)
         }
     } else {
         Ok(None)
@@ -152,15 +194,17 @@ fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> 
 }
 
 /// Parse TXT_ELEMENT := ("txt:" STRING | STRING)+
-fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
+fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     let mut texts = Vec::new();
 
     while let Some(token) = tokenizer.peek() {
-        // Stop if we hit a non-text element or separator
+        // Stop if we hit a non-text element or separator or brackets
         if token.starts_with("bar:")
             || token.starts_with("img:")
             || token.starts_with("qrc:")
             || token == "+"
+            || token == "["
+            || token == "]"
         {
             break;
         }
@@ -174,10 +218,13 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     }
 
     if texts.is_empty() {
-        return Err("Empty text element".into());
+        return Ok(None);
     }
 
-    Ok(Box::new(Text::new(&texts, tokenizer.text_options.clone())?))
+    Ok(Some(Box::new(Text::new(
+        &texts,
+        tokenizer.text_options.clone(),
+    )?)))
 }
 
 /// Create Row element or return single element if columns.len() == 1
