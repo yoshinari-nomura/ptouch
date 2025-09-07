@@ -120,6 +120,13 @@
      #+ATTR_HTML: :height 85px
      [[file:images/horizontal.png]]
 
+   + Enclosing with =[= and =]= groups it as a single element
+     #+begin_src bash :results silent
+       ptouch image -s 45 -p center -o images/complex.png Hello [ "qrc:Hello World" + "World" ]
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/complex.png]]
+
 ** Types of Elements
    Elements are strings with the following prefixes:
    + =txt:= prefix (txt: can be omitted): Text element

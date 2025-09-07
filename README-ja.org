@@ -118,6 +118,13 @@
      #+ATTR_HTML: :height 85px
      [[file:images/horizontal.png]]
 
+   + =[= と =]= で囲むと 1つの element としてグループ化します．
+     #+begin_src bash :results silent
+       ptouch image -s 45 -p center -o images/complex.png Hello [ "qrc:Hello World" + "World" ]
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/complex.png]]
+
 ** Element の種類
    Element は，以下のプレフィクスを付けた文字列です．
    + =txt:= プレフィックス (txt: は省略可): テキスト要素
