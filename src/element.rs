@@ -159,12 +159,33 @@ fn create_text_element(
         .set("fill", "black")
         .set("text-anchor", "start")
         .set("xml:space", "preserve")
+        // ImageMagick `convert` does not respect dominant-baseline.
+        // So, if ptouch creates an SVG with dominant-baseline
+        // and convert it by ImageMagick, PNG will be broken.
+        // It is sad.
+        // .set("dominant-baseline", "hanging")
         .set("y", 0);
 
-    // Use larger dy for first line to ensure positive bbox coordinates
-    let mut dy = font_size * 2; // Double the font size for first line
+    // As for resvg crate, which is used in ptouch,
+    // it renders the text out of ViewBox without dominant-baseline="hanging"
+    //
+    // Therefore, we have to use large `dy` at the first line to
+    // put the whole line in ViewBox. Double the font size will work.
+    //
+    // If you do not care about ImageMagic, enable dominant-baseline="hanging" and:
+    //   let mut dy = 0;
+    // is enough.
+    let mut dy = font_size * 2;
+
     for line in texts {
-        let tspan = svge::TSpan::new(line.clone()).set("x", 0).set("dy", dy);
+        let str = if line.is_empty() {
+            // Empty tspan not rendered / dy-value ignored
+            // https://stackoverflow.com/questions/34078357/empty-tspan-not-rendered-dy-value-ignored
+            " ".into()
+        } else {
+            line.clone()
+        };
+        let tspan = svge::TSpan::new(str).set("x", 0).set("dy", dy);
         text = text.add(tspan);
         dy = line_height; // Subsequent lines use normal line height
     }
@@ -208,7 +229,7 @@ fn calculate_text_bbox(
         .add(txt);
     let svg = doc.to_string();
 
-    // Use pixel-based bounding box calculation
+    // let result = calculate_text_logical_bbox(&svg, fontdb)?;
     let result = calculate_pixel_bbox(&svg, fontdb)?;
 
     Ok(result)
@@ -234,6 +255,45 @@ pub fn render_svg_to_pixmap(svg_data: &str, fontdb: &Arc<Database>) -> Result<ti
     );
 
     Ok(pixmap)
+}
+
+// Calculate text bounding box using SVG text metrics instead of pixel scanning
+// **doesn't actually work**
+//
+// This is because this function assumes that Text has `dominant-baseline="hanging"`
+// and the first tspan is created with `dy="0"`.  The SVG created by
+// `create_text_element` doesn't satisfy these conditions.
+//
+// Additionally, this function generates a larger bbox than pixel
+// scanning. While it's not suitable for creating a PNG that fits
+// perfectly on tape, I've kept it as it may be useful for debugging
+// purposes.
+//
+#[allow(dead_code)]
+fn calculate_text_logical_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<BoundingBox> {
+    let options = usvg::Options {
+        fontdb: fontdb.clone(),
+        ..Default::default()
+    };
+
+    let tree = usvg::Tree::from_str(svg_data, &options)?;
+
+    // Try to get the overall bounding box of the SVG tree
+    // This should include all elements including text with proper whitespace positioning
+    let bbox = tree.root().abs_bounding_box();
+
+    // Check if the bounding box has valid dimensions
+    if bbox.width() > 0.0 && bbox.height() > 0.0 {
+        Ok(BoundingBox {
+            width: bbox.width(),
+            height: bbox.height(),
+            x: bbox.left(),
+            y: bbox.top(),
+        })
+    } else {
+        // Fallback to pixel-based calculation if no valid bounding box found
+        calculate_pixel_bbox(svg_data, fontdb)
+    }
 }
 
 fn calculate_pixel_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<BoundingBox> {
@@ -269,6 +329,19 @@ fn calculate_pixel_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<Boundi
             }
         }
     }
+
+    // If you want to get a bbox that only cuts out the real drawing area,
+    // you should not set min_x to 0, but I set it to 0 for the following reasons:
+    //
+    // 1. preserve the spaces that users put at the beginning of lines.
+    // 2. The size of the left side bearing of the first character differs
+    //    for each glyph, so when Text elements are arranged vertically, they
+    //    may become uneven.
+    //
+    // Therefore, it will result in generating a wider bbox with the
+    // left-side bearing of the first character.
+    //
+    min_x = 0;
 
     let result = if found_pixel {
         BoundingBox {
