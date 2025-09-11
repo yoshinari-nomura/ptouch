@@ -38,6 +38,25 @@ impl BoundingBox {
         }
     }
 
+    /// Check if this bounding box is empty (no content)
+    pub fn is_empty(&self) -> bool {
+        self.width == 0.0 && self.height == 0.0
+    }
+
+    /// Calculate the union of two bounding boxes for layering.
+    /// The x, y coordinates are always taken from self (base layer).
+    pub fn union(&self, other: &Self) -> Self {
+        let mx = (self.x + self.width).max(other.x + other.width);
+        let my = (self.y + self.height).max(other.y + other.height);
+
+        Self {
+            x: self.x, // Base layer coordinates
+            y: self.y, // Base layer coordinates
+            width: mx - self.x,
+            height: my - self.y,
+        }
+    }
+
     /// Append another bounding box horizontally
     pub fn h_append(&self, other: Self) -> Self {
         Self {
@@ -689,5 +708,48 @@ impl Display for Gap {
         } else {
             write!(f, "Gap({}x{})", self.width, self.height)
         }
+    }
+}
+
+pub struct Overlay {
+    elements: Vec<Box<dyn Element>>,
+}
+
+impl Overlay {
+    pub fn new(elements: Vec<Box<dyn Element>>) -> Self {
+        Overlay { elements }
+    }
+}
+
+impl Element for Overlay {
+    fn bounding_box(&self) -> Result<BoundingBox> {
+        self.elements
+            .iter()
+            .map(|e| e.bounding_box())
+            .try_fold(BoundingBox::default(), |acc, bbox| Ok(acc.union(&bbox?)))
+    }
+
+    fn render(&self) -> Result<svge::Group> {
+        let mut group = svge::Group::new();
+
+        // Stack layers in order (later layers render on top)
+        for element in &self.elements {
+            let layer_group = element.render_at(0.0, 0.0)?;
+            group = group.add(layer_group);
+        }
+
+        Ok(group)
+    }
+
+    fn is_visible(&self) -> bool {
+        // At least one layer is visible
+        self.elements.iter().any(|e| e.is_visible())
+    }
+}
+
+impl Display for Overlay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let layers: Vec<String> = self.elements.iter().map(|e| format!("{}", e)).collect();
+        write!(f, "Overlay({})", layers.join(","))
     }
 }

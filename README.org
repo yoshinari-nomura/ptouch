@@ -120,6 +120,15 @@
      #+ATTR_HTML: :height 85px
      [[file:images/horizontal.png]]
 
+   + Separating with =/= creates new layer (overlay)
+     + All layers share the same coordinates
+     + Useful for creating backgrounds, borders, or composite designs
+     #+begin_src bash :results silent
+       ptouch image -s 50 -p center -o images/overlay.png "□□□" / "△△△"
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/overlay.png]]
+
    + Enclosing with =[= and =]= groups it as a single element
      #+begin_src bash :results silent
        ptouch image -s 45 -p center -o images/complex.png Hello [ "qrc:Hello World" + "World" ]

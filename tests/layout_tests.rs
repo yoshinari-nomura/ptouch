@@ -296,3 +296,89 @@ fn test_box_in_horizontal_layout() {
     // Expected: padding(5) + box(10) + padding(5) - original_padding(5) = 15
     assert_eq!(bbox2.width, bbox1.width + 15.0);
 }
+
+// Tests for Overlay element (layer support)
+#[test]
+fn test_single_layer() {
+    // Single layer should not create Overlay
+    assert_parse_result("Hello World", "Text(Hello,World)");
+}
+
+#[test]
+fn test_simple_overlay() {
+    // Two layers separated by "/"
+    assert_parse_result("Hello / World", "Overlay(Text(Hello),Text(World))");
+}
+
+#[test]
+fn test_overlay_with_complex_layers() {
+    // Complex layers with Row and Column
+    assert_parse_result(
+        "box:100x50 / Title Content",
+        "Overlay(Box(100x50),Text(Title,Content))",
+    );
+}
+
+#[test]
+fn test_overlay_with_horizontal_layout() {
+    // Overlay with horizontal layouts
+    assert_parse_result(
+        "A + B / C + D",
+        "Overlay(Row(Text(A),Text(B)),Row(Text(C),Text(D)))",
+    );
+}
+
+#[test]
+fn test_overlay_with_brackets() {
+    // Overlay with bracket grouping
+    assert_parse_result(
+        "[ A + B ] / [ C + D ]",
+        "Overlay(Row(Text(A),Text(B)),Row(Text(C),Text(D)))",
+    );
+}
+
+#[test]
+fn test_overlay_with_qr_code() {
+    // Overlay with QR code and text
+    assert_parse_result(
+        "qrc:example.com / Contact Info",
+        "Overlay(QrCode(example.com),Text(Contact,Info))",
+    );
+}
+
+#[test]
+fn test_three_layer_overlay() {
+    // Three layers
+    assert_parse_result(
+        "Background / Middle / Foreground",
+        "Overlay(Text(Background),Text(Middle),Text(Foreground))",
+    );
+}
+
+#[test]
+fn test_overlay_with_gap() {
+    // Overlay with gap elements
+    assert_parse_result(
+        "gap:50x20 / Hello World",
+        "Overlay(Gap(50x20),Text(Hello,World))",
+    );
+}
+
+// Error cases for overlay
+#[test]
+fn test_empty_layer_error() {
+    // Empty layer before "/" should error
+    let result = parse_test_script("Hello / / World");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("No COLUMN"));
+}
+
+#[test]
+fn test_trailing_slash_error() {
+    // Trailing "/" should error
+    let result = parse_test_script("Hello /");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("No COLUMN"));
+}

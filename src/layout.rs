@@ -1,13 +1,17 @@
 use crate::Result;
-use crate::element::{Column, Element, Gap, QrCode, Row, RowOptions, Text, TextOptions};
+use crate::element::{Column, Element, Gap, Overlay, QrCode, Row, RowOptions, Text, TextOptions};
 
 /// Parse layout script DSL into Element tree
 ///
 /// Syntax (BNF):
+/// - {OVERLAY} := {LAYER} ("/" {LAYER})*
+/// - {LAYER}   := {ROW}                     // pseudo (identity transformation)
 /// - {ROW}     := {COLUMN} ("+" {COLUMN})*
 /// - {COLUMN}  := {FACTOR}+
 /// - {FACTOR}  := {ELEMENT} | "[" {ROW} "]"
 /// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {GAP} | {BOX} | {TXT}
+///
+/// Note: LAYER is omitted in implementation and ROW is directly reduced to OVERLAY.
 ///
 /// - {BAR} := "bar:"{STRING}
 /// - {IMG} := "img:"{STRING}
@@ -48,14 +52,14 @@ pub fn parse_layout_script(
 
     let tokens: Vec<&str> = script.iter().map(|s| s.as_str()).collect();
     let mut tokenizer = Tokenizer::new(tokens, text_options, row_options);
-    let row = parse_row(&mut tokenizer)?;
+    let overlay = parse_overlay(&mut tokenizer)?;
 
     // Check for unconsumed tokens (like unmatched ']')
     if !tokenizer.is_empty() {
         return Err(format!("Syntax error at {}", tokenizer.position_info()).into());
     }
 
-    Ok(row)
+    Ok(overlay)
 }
 
 /// Tokenizer for layout script DSL
@@ -118,6 +122,23 @@ impl<'a> Tokenizer<'a> {
             )
         }
     }
+}
+
+/// Parse OVERLAY := ROW ("/" ROW)*
+fn parse_overlay(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
+    let mut rows = Vec::new();
+
+    // Parse first row
+    let row = parse_row(tokenizer)?;
+    rows.push(row);
+
+    // Parse additional rows separated by "/"
+    while tokenizer.expect("/") {
+        let row = parse_row(tokenizer)?;
+        rows.push(row);
+    }
+
+    create_overlay_element(rows)
 }
 
 /// Parse ROW := COLUMN ("+" COLUMN)*
@@ -217,6 +238,7 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element
             || token.starts_with("gap:")
             || token.starts_with("box:")
             || token == "+"
+            || token == "/"
             || token == "["
             || token == "]"
         {
@@ -261,5 +283,15 @@ fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Elem
         0 => Err("No elements found".into()),
         1 => Ok(elements.pop().unwrap()),
         _ => Ok(Box::new(Column::new(elements, 20.0))),
+    }
+}
+
+/// Create Overlay element or return single element if elements.len() == 1
+fn create_overlay_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Element>> {
+    let mut elements = elements;
+    match elements.len() {
+        0 => Err("No rows found".into()),
+        1 => Ok(elements.pop().unwrap()),
+        _ => Ok(Box::new(Overlay::new(elements))),
     }
 }

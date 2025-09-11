@@ -118,6 +118,15 @@
      #+ATTR_HTML: :height 85px
      [[file:images/horizontal.png]]
 
+   + =/= で区切ると新しいレイヤ (オーバレイ) を生成します．
+     + 全レイヤは同じ位置で順番に積み上がって描画されます．
+     + 背景，枠線，複合デザインの作成に便利です．
+     #+begin_src bash :results silent
+       ptouch image -s 50 -p center -o images/overlay.png "□□□" / "△△△"
+     #+end_src
+     #+ATTR_HTML: :height 85px
+     [[file:images/overlay.png]]
+
    + =[= と =]= で囲むと 1つの element としてグループ化します．
      #+begin_src bash :results silent
        ptouch image -s 45 -p center -o images/complex.png Hello [ "qrc:Hello World" + "World" ]
