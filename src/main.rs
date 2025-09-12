@@ -256,7 +256,7 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
         align: args.placement.into(),
         // At 360 DPI, 14.0 is 1mm, 20.0 is 1.4mm
         // Note: This depends on ""quiet zone" of QR code
-        padding: 20.0,
+        padding: 20.0, // FIXME: 360DPI
     };
 
     // Create label using layout script parsing

@@ -282,7 +282,7 @@ fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Elem
     match elements.len() {
         0 => Err("No elements found".into()),
         1 => Ok(elements.pop().unwrap()),
-        _ => Ok(Box::new(Column::new(elements, 20.0))),
+        _ => Ok(Box::new(Column::new(elements, 20.0))), // FIXME: 360DPI
     }
 }
 

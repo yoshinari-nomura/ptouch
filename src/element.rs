@@ -394,7 +394,7 @@ impl QrCode {
 
         Ok(QrCode {
             data,
-            module_size: 5.0, // 5 SVG units ≈ 0.35mm at 360dpi
+            module_size: 5.0, // 5 SVG units ≈ 0.35mm at 360dpi FIXME: 360DPI
         })
     }
 
