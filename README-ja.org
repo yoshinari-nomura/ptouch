@@ -27,16 +27,16 @@
   Linux で動作を確認していますが，おそらく macOS や Windows でもビルドできると思います．
 
 * 印刷対応機種
-  | 機種名    | 対応状況  | USB vid:pid | コメント                  |
-  |-----------+-----------+-------------+---------------------------|
-  | PT-P900W  | Confirmed | 04f9:2085   | Wi-Fi/USB 動作確認済      |
-  | PT-P900   | Maybe     | 04f9:2083   |                           |
-  | PT-P950NW | Maybe     | 04f9:2086   |                           |
-  | PT-2430PC | Not yet   | 04f9:202d   | コマンドは同じだが 180DPI |
+  | 機種名    | 対応状況  | USB vid:pid | コメント             |
+  |-----------+-----------+-------------+----------------------|
+  | PT-P900W  | Confirmed | 04f9:2085   | Wi-Fi/USB 動作確認済 |
+  | PT-P900   | Maybe     | 04f9:2083   |                      |
+  | PT-P950NW | Maybe     | 04f9:2086   |                      |
+  | PT-2430PC | Confirmed | 04f9:202d   | 180DPI               |
 
   + PT-2430PC (USB 専用機) は，PT-P900 シリーズと同じ USB のコマンド体
-    系を持っていますが，他機種が 360DPI に対して 180DPI
-    のため対応できていません．しかし，少しの改造で対応できるでしょう．
+    系を持っていますが，他機種が 360DPI に対して 180DPI です．
+    =-r 180= オプションを付けてイメージを作成してください．
 
 * Usage
   + ptouch -h
@@ -65,7 +65,8 @@
         -l, --line-height <LINE_HEIGHT>  Line height in pixels [default: font-size]
         -o, --output <OUTPUT>            Output to file [default: stdout]
         -p, --placement <PLACEMENT>      Place contents [default: top]
-        -r, --rotate                     Rotate image by 90 degrees
+        -r, --resolution <RESOLUTION>    Printer resolution in DPI [default: 360]
+        -R, --rotate                     Rotate image by 90 degrees
         -s, --font-size <FONT_SIZE>      Font size in pixels [default: 24]
         -t, --tape-name <TAPE_NAME>      Tape size in mm [default: 12]
         -S, --source                     Output SVG source instead of PNG
@@ -183,9 +184,9 @@
       [[file:images/hello-a.png]]
 
 *** 幅広テープを利用した回転配置
-    + =-r= で 90度回転し， =-a= でテープ幅一杯に配置しています．
+    + =-R= で 90度回転し， =-a= でテープ幅一杯に配置しています．
     #+begin_src bash :results silent
-      ptouch image -d -a -r -p center -s 50 -o images/qr-hello-world-a-r.png \
+      ptouch image -d -a -R -p center -s 50 -o images/qr-hello-world-a-r.png \
         "qrc:Hello World" + "Hello World"
     #+end_src
     #+ATTR_HTML: :height 255px
@@ -194,7 +195,7 @@
 *** PCBコネクタの例
     コネクタのピッチ (0.1 インチ) に改行幅を設定 (=-l= 36) しています．
     #+begin_src bash :results silent
-      ptouch image -d -r -p bottom -l 36 -o images/pcb-connector-r.png \
+      ptouch image -d -R -p bottom -l 36 -o images/pcb-connector-r.png \
         "+5V" "SIN" "GND" "SBUSY" "SCK" "RESET"
     #+end_src
 

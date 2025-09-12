@@ -11,7 +11,7 @@ use ptouch::label::{Label, LabelOptions, Placement as LabelPlacement};
 use ptouch::layout;
 use ptouch::printable_image::PrintableImage;
 use ptouch::printer::Printer;
-use ptouch::tape::{self, TapeSpec};
+use ptouch::tape::{self, Tape, TapeSpec};
 use ptouch::{Result, get_font_names, load_fontdb_with_paths, unescape_shell_string};
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
@@ -86,16 +86,48 @@ impl std::fmt::Display for TapeName {
     }
 }
 
-impl From<TapeName> for tape::TapeName {
-    fn from(tape_name: TapeName) -> Self {
-        match tape_name {
-            TapeName::Tape3_5 => tape::TapeName::Tape3_5,
-            TapeName::Tape6 => tape::TapeName::Tape6,
-            TapeName::Tape9 => tape::TapeName::Tape9,
-            TapeName::Tape12 => tape::TapeName::Tape12,
-            TapeName::Tape18 => tape::TapeName::Tape18,
-            TapeName::Tape24 => tape::TapeName::Tape24,
-            TapeName::Tape36 => tape::TapeName::Tape36,
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
+enum Resolution {
+    #[value(name = "180")]
+    Dpi180,
+    #[value(name = "360")]
+    Dpi360,
+}
+
+impl Resolution {
+    fn to_dpi(self) -> u32 {
+        match self {
+            Resolution::Dpi180 => 180,
+            Resolution::Dpi360 => 360,
+        }
+    }
+}
+
+impl std::fmt::Display for Resolution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_dpi())
+    }
+}
+
+impl TapeName {
+    fn to_tape(self, resolution: Resolution) -> Result<Tape> {
+        match (self, resolution) {
+            (TapeName::Tape3_5, Resolution::Dpi360) => Ok(Tape::TZe3H),
+            (TapeName::Tape6, Resolution::Dpi360) => Ok(Tape::TZe6H),
+            (TapeName::Tape9, Resolution::Dpi360) => Ok(Tape::TZe9H),
+            (TapeName::Tape12, Resolution::Dpi360) => Ok(Tape::TZe12H),
+            (TapeName::Tape18, Resolution::Dpi360) => Ok(Tape::TZe18H),
+            (TapeName::Tape24, Resolution::Dpi360) => Ok(Tape::TZe24H),
+            (TapeName::Tape36, Resolution::Dpi360) => Ok(Tape::TZe36H),
+            (TapeName::Tape3_5, Resolution::Dpi180) => Ok(Tape::TZe3L),
+            (TapeName::Tape6, Resolution::Dpi180) => Ok(Tape::TZe6L),
+            (TapeName::Tape9, Resolution::Dpi180) => Ok(Tape::TZe9L),
+            (TapeName::Tape12, Resolution::Dpi180) => Ok(Tape::TZe12L),
+            (TapeName::Tape18, Resolution::Dpi180) => Ok(Tape::TZe18L),
+            (TapeName::Tape24, Resolution::Dpi180) => Ok(Tape::TZe24L),
+            (TapeName::Tape36, Resolution::Dpi180) => {
+                Err("36mm tape not supported on 180DPI printers".into())
+            }
         }
     }
 }
@@ -160,8 +192,14 @@ struct ImageArgs {
           hide_possible_values = true)]
     placement: Placement,
 
+    /// Printer resolution in DPI
+    #[arg(short = 'r', long = "resolution", default_value_t = Resolution::Dpi360,
+          long_help = "Printer resolution in DPI. [possible values: 180, 360]",
+          hide_possible_values = true)]
+    resolution: Resolution,
+
     /// Rotate image by 90 degrees
-    #[arg(short = 'r', long = "rotate")]
+    #[arg(short = 'R', long = "rotate")]
     rotate: bool,
 
     /// Font size in pixels
@@ -242,9 +280,15 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     };
 
     // Create label options (simplified)
+    let tape_spec = TapeSpec::new(args.tape_name.to_tape(args.resolution)?);
+
+    // At 360 DPI, 14.0 is 1mm, 20.0 is 1.4mm
+    // Note: This depends on ""quiet zone" of QR code
+    let row_padding = tape_spec.mm_to_dots(1.4) as f32;
+
     let label_options = LabelOptions {
         fontdb,
-        tape_spec: TapeSpec::new(args.tape_name.into()),
+        tape_spec,
         auto_scale: args.auto_scale,
         rotate: args.rotate,
         placement: args.placement.into(),
@@ -254,9 +298,7 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     // Create row options from placement
     let row_options = RowOptions {
         align: args.placement.into(),
-        // At 360 DPI, 14.0 is 1mm, 20.0 is 1.4mm
-        // Note: This depends on ""quiet zone" of QR code
-        padding: 20.0, // FIXME: 360DPI
+        padding: row_padding,
     };
 
     // Create label using layout script parsing
@@ -306,11 +348,7 @@ fn handle_print_command(args: PrintArgs) -> Result<()> {
     let png_info = reader.info();
     let png_height = png_info.height;
 
-    // Get tape spec from PNG dimensions
-    let png_tape_spec = tape::TapeSpec::from_width(png_height)
-        .ok_or_else(|| format!("Unsupported PNG height: {} pixels", png_height))?;
-
-    // Check printer status to get actual tape width and verify compatibility
+    // Check printer status to get DPI and tape width
     println!("Checking printer status...");
 
     let backend = backend::from_host(&args.host)?;
@@ -324,16 +362,34 @@ fn handle_print_command(args: PrintArgs) -> Result<()> {
         return Err("Cannot print due to printer errors".into());
     }
 
+    // Get printer DPI and tape width
+    let printer_dpi = status.printer_dpi();
     let actual_tape_width = status.media_width_mm();
-    let printer_tape_spec = tape::TapeSpec::from_width_mm(actual_tape_width)
-        .ok_or_else(|| format!("Unsupported tape width: {} mm", actual_tape_width))?;
+
+    // Get tape spec from PNG dimensions using printer's DPI
+    let png_tape_spec = tape::TapeSpec::from_width_dots_and_dpi(png_height, printer_dpi)
+        .ok_or_else(|| {
+            format!(
+                "Unsupported PNG height: {} pixels at {}DPI",
+                png_height, printer_dpi
+            )
+        })?;
+
+    // Get printer tape spec using the same DPI
+    let printer_tape_spec = tape::TapeSpec::from_width_mm_and_dpi(actual_tape_width, printer_dpi)
+        .ok_or_else(|| {
+        format!(
+            "Unsupported tape width: {} mm at {}DPI",
+            actual_tape_width, printer_dpi
+        )
+    })?;
 
     // Verify PNG tape spec matches printer tape spec
-    if png_tape_spec.width != printer_tape_spec.width {
+    if png_tape_spec.width_dots != printer_tape_spec.width_dots {
         return Err(format!(
             "Tape specification mismatch: PNG expects {}mm tape ({}px width), but printer has {}mm tape ({}px width)",
-            png_tape_spec.width_mm, png_tape_spec.width,
-            printer_tape_spec.width_mm, printer_tape_spec.width
+            png_tape_spec.width_mm, png_tape_spec.width_dots,
+            printer_tape_spec.width_mm, printer_tape_spec.width_dots
         ).into());
     }
 

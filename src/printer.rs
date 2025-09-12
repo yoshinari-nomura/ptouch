@@ -47,7 +47,8 @@ impl<B: Backend> Printer<B> {
                 false,       // high_resolution
                 false,       // no_buffer_clear
             )
-            .specify_margin_amount(14) // 14 dots = 1mm
+            // dev manual requires 14dots min (1mm @ 360DPI, 2mm@ 1 80DPI)
+            .specify_margin_amount(14)
             .select_compression_mode(true); // TIFF compression
 
         // Add raster lines

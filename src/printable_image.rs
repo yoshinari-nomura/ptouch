@@ -15,10 +15,10 @@ impl PrintableImage {
         let png_info = reader.info();
         let png_height = png_info.height;
 
-        if png_height != tape_spec.width {
+        if png_height != tape_spec.width_dots {
             return Err(format!(
                 "PNG height mismatch: PNG height is {} pixels, but {} mm tape requires {} pixels",
-                png_height, tape_spec.width_mm, tape_spec.width
+                png_height, tape_spec.width_mm, tape_spec.width_dots
             )
             .into());
         }
@@ -48,7 +48,7 @@ fn png_to_raster_lines(png_data: &[u8], tape_spec: &TapeSpec) -> Result<Vec<Vec<
 
     let width = info.width as usize;
     let height = info.height as usize;
-    let bytes_per_raster = 70; // 560 bits = 70 bytes
+    let bytes_per_raster = (tape_spec.total_pins / 8) as usize;
     let mut raster_lines = Vec::new();
 
     for x in 0..width {
@@ -56,14 +56,14 @@ fn png_to_raster_lines(png_data: &[u8], tape_spec: &TapeSpec) -> Result<Vec<Vec<
 
         // Mapping the Y-range (margin, margin+inner-1) of the PNG to
         // (right_pin, right_pin+inner-1)
-        let margin = tape_spec.margin as usize;
-        let inner = tape_spec.inner as usize;
-        let right_pin = tape_spec.right_pin as usize;
+        let margin = ((tape_spec.width_dots - tape_spec.inner_dots) / 2) as usize;
+        let inner = tape_spec.inner_dots as usize;
+        let right_pin = tape_spec.right_pins as usize;
 
         for y in margin..(margin + inner).min(height) {
             let pin = right_pin + (y - margin);
 
-            if pin < 560 {
+            if pin < tape_spec.total_pins as usize {
                 let pixel_idx = y * width + x;
                 if pixel_idx < gray_buf.len() {
                     let pixel = gray_buf[pixel_idx];

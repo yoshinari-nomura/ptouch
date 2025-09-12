@@ -31,6 +31,14 @@ impl Status {
         self.raw_data[11]
     }
 
+    pub fn printer_dpi(&self) -> u32 {
+        match self.raw_data[4] {
+            0x6F | 0x70 | 0x71 | 0x78 => 360, // PT-P900W, PT-P950NW, PT-P900, PT-P910BT
+            0x5A => 180,                      // PT-9200PC
+            _ => 360,
+        }
+    }
+
     pub fn print_status_info(&self, verbose: bool) {
         if verbose {
             println!("Raw status response ({} bytes):", self.raw_data.len());

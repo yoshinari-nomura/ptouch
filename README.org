@@ -9,7 +9,7 @@
 #+OPTIONS: timestamp:nil timestamps:nil
 #+LANGUAGE: en
 
-[[file:README-ja.org][日本語(Japanese)]]
+[[file:README-ja.org][日本語 (Japanese)]]
 
 * What is ptouch?
   ptouch is a CLI tool for Brother P-TOUCH label writers written in Rust, with the following features:
@@ -34,11 +34,10 @@
   | PT-P900W  | Confirmed | 04f9:2085   | Wi-Fi/USB operation confirmed |
   | PT-P900   | Maybe     | 04f9:2083   |                               |
   | PT-P950NW | Maybe     | 04f9:2086   |                               |
-  | PT-2430PC | Not yet   | 04f9:202d   | Same commands but 180DPI      |
+  | PT-2430PC | Confirmed | 04f9:202d   | 180DPI                        |
 
   + PT-2430PC (USB only model) has the same USB command set as the PT-P900 series,
-    but its engine is 180DPI compared to the 360DPI of other models, so it's not yet
-    supported. However, it could be supported with a small modification.
+    but its engine is 180DPI. Option =-r 180= is required on image creation.
 
 * Usage
   + ptouch -h
@@ -67,7 +66,8 @@
         -l, --line-height <LINE_HEIGHT>  Line height in pixels [default: font-size]
         -o, --output <OUTPUT>            Output to file [default: stdout]
         -p, --placement <PLACEMENT>      Place contents [default: top]
-        -r, --rotate                     Rotate image by 90 degrees
+        -r, --resolution <RESOLUTION>    Printer resolution in DPI [default: 360]
+        -R, --rotate                     Rotate image by 90 degrees
         -s, --font-size <FONT_SIZE>      Font size in pixels [default: 24]
         -t, --tape-name <TAPE_NAME>      Tape size in mm [default: 12]
         -S, --source                     Output SVG source instead of PNG
@@ -185,9 +185,9 @@
       [[file:images/hello-a.png]]
 
 *** Rotated Layout Using Wide Tape
-    + Rotated 90 degrees with =-r= and placed to fit the full tape width with =-a=.
+    + Rotated 90 degrees with =-R= and placed to fit the full tape width with =-a=.
     #+begin_src bash :results silent
-      ptouch image -d -a -r -p center -s 50 -o images/qr-hello-world-a-r.png \
+      ptouch image -d -a -R -p center -s 50 -o images/qr-hello-world-a-r.png \
         "qrc:Hello World" + "Hello World"
     #+end_src
     #+ATTR_HTML: :height 255px
@@ -196,7 +196,7 @@
 *** PCB Connector Example
     Line height is set to connector pitch (0.1 inch) with =-l 36=.
     #+begin_src bash :results silent
-      ptouch image -d -r -p bottom -l 36 -o images/pcb-connector-r.png \
+      ptouch image -d -R -p bottom -l 36 -o images/pcb-connector-r.png \
         "+5V" "SIN" "GND" "SBUSY" "SCK" "RESET"
     #+end_src
 

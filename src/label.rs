@@ -85,9 +85,9 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     // Elementからbounding_boxを取得
     let bbox = element.bounding_box()?;
 
-    let vh = tape.width as f32;
-    let ch = tape.inner as f32;
-    let m = tape.margin as f32;
+    let vh = tape.width_dots as f32;
+    let ch = tape.inner_dots as f32;
+    let m = ((tape.width_dots - tape.inner_dots) / 2) as f32;
 
     // For rotation, we need to consider how the text dimensions map to tape dimensions
     let (effective_width, effective_height) = if options.rotate {
