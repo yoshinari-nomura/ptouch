@@ -133,7 +133,7 @@ fn test_empty_brackets() {
     let result = parse_test_script("[ ]");
     assert!(result.is_err());
     let error_msg = format!("{}", result.err().unwrap());
-    assert!(error_msg.contains("No COLUMN"));
+    assert!(error_msg.contains("No effective elements in COLUMN"));
 }
 
 #[test]
@@ -371,7 +371,7 @@ fn test_empty_layer_error() {
     let result = parse_test_script("Hello / / World");
     assert!(result.is_err());
     let error_msg = format!("{}", result.err().unwrap());
-    assert!(error_msg.contains("No COLUMN"));
+    assert!(error_msg.contains("No effective elements in COLUMN"));
 }
 
 #[test]
@@ -380,5 +380,97 @@ fn test_trailing_slash_error() {
     let result = parse_test_script("Hello /");
     assert!(result.is_err());
     let error_msg = format!("{}", result.err().unwrap());
-    assert!(error_msg.contains("No COLUMN"));
+    assert!(error_msg.contains("No effective elements in COLUMN"));
+}
+
+// Font operation tests
+#[test]
+fn test_font_not_in_element_tree() {
+    // Font operations should not appear in the element tree
+    assert_parse_result("fnt:Arial:16 Hello World", "Text(Hello,World)");
+}
+
+#[test]
+fn test_font_with_multiple_texts() {
+    // Font operation affects subsequent text
+    assert_parse_result("fnt:Arial:16 Hello + World", "Row(Text(Hello),Text(World))");
+}
+
+#[test]
+fn test_font_only_column_error() {
+    // Column with only font operations should error
+    let result = parse_test_script("fnt:Arial:16");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("No effective elements in COLUMN"));
+}
+
+#[test]
+fn test_font_only_in_brackets_error() {
+    // Bracketed section with only font operations should error
+    let result = parse_test_script("Hello + [ fnt:Arial:16 ] + World");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("No effective elements in COLUMN"));
+}
+
+#[test]
+fn test_multiple_font_operations_error() {
+    // Multiple font operations without text should error
+    let result = parse_test_script("fnt:Arial:16 fnt:default fnt:pop");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("No effective elements in COLUMN"));
+}
+
+#[test]
+fn test_font_operations_with_text() {
+    // Font operations with actual text should work
+    assert_parse_result(
+        "fnt:Arial:16 fnt:default Hello fnt:pop World",
+        "Column(Text(Hello),Text(World))",
+    );
+}
+
+#[test]
+fn test_font_in_horizontal_layout() {
+    // Font operations in horizontal layout
+    assert_parse_result(
+        "Hello + fnt:Arial:16 World + fnt:default End",
+        "Row(Text(Hello),Text(World),Text(End))",
+    );
+}
+
+#[test]
+fn test_font_partial_specification() {
+    // Font operations with partial specifications should work
+    assert_parse_result("fnt:Arial::20 Hello", "Text(Hello)");
+    assert_parse_result("fnt:::24 World", "Text(World)");
+}
+
+#[test]
+fn test_font_default_and_pop() {
+    // Font default and pop operations should work
+    assert_parse_result(
+        "fnt:default Hello fnt:pop World",
+        "Column(Text(Hello),Text(World))",
+    );
+}
+
+#[test]
+fn test_invalid_font_size() {
+    // Invalid font size should error
+    let result = parse_test_script("fnt:Arial:invalid Hello");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("Invalid font size: invalid"));
+}
+
+#[test]
+fn test_invalid_line_height() {
+    // Invalid line height should error
+    let result = parse_test_script("fnt:Arial:16:invalid Hello");
+    assert!(result.is_err());
+    let error_msg = format!("{}", result.err().unwrap());
+    assert!(error_msg.contains("Invalid line height: invalid"));
 }

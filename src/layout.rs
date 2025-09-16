@@ -9,7 +9,7 @@ use crate::element::{Column, Element, Gap, Overlay, QrCode, Row, RowOptions, Tex
 /// - {ROW}     := {COLUMN} ("+" {COLUMN})*
 /// - {COLUMN}  := {FACTOR}+
 /// - {FACTOR}  := {ELEMENT} | "[" {ROW} "]"
-/// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {GAP} | {BOX} | {TXT}
+/// - {ELEMENT} := {BAR} | {IMG} | {QRC} | {GAP} | {BOX} | {FNT} | {TXT}
 ///
 /// Note: LAYER is omitted in implementation and ROW is directly reduced to OVERLAY.
 ///
@@ -18,12 +18,17 @@ use crate::element::{Column, Element, Gap, Overlay, QrCode, Row, RowOptions, Tex
 /// - {QRC} := "qrc:"{STRING}
 /// - {GAP} := "gap:"{SPEC}
 /// - {BOX} := "box:"{SPEC}
+/// - {FNT} := "fnt:"{FONT_SPEC}
 /// - {TXT} := ("txt:"{STRING} | {STRING})+
 ///
-/// - Prefixes: "txt:", "qrc:", "bar:", "img:" (defaults to "txt:" if no prefix)
+/// - {FONT_SPEC} := {FONT_NAME}:{SIZE}:{LINE_HEIGHT} | "default" | "pop"
+///
+/// - Prefixes: "txt:", "qrc:", "bar:", "img:", "fnt:" (defaults to "txt:" if no prefix)
 /// - "+" separates COLUMN, and layouts columns horizontally (creates ROW)
 /// - Continuous text becomes a single text element.
 /// - Creating Column or Row only when there are multiple elements to contain
+/// - Font operations (fnt:) are side-effects only;
+///   a COLUMN with only font operations will result in an error
 ///
 /// Examples:
 /// Happy Birthday
@@ -66,7 +71,7 @@ pub fn parse_layout_script(
 struct Tokenizer<'a> {
     tokens: Vec<&'a str>,
     position: usize,
-    text_options: &'a TextOptions,
+    font_stack: Vec<TextOptions>,
     row_options: &'a RowOptions,
 }
 
@@ -79,8 +84,26 @@ impl<'a> Tokenizer<'a> {
         Self {
             tokens,
             position: 0,
-            text_options,
+            font_stack: vec![text_options.clone()],
             row_options,
+        }
+    }
+
+    fn current_font(&self) -> TextOptions {
+        self.font_stack.last().unwrap().clone()
+    }
+
+    fn default_font(&self) -> TextOptions {
+        self.font_stack[0].clone()
+    }
+
+    fn push_font(&mut self, font: TextOptions) {
+        self.font_stack.push(font);
+    }
+
+    fn pop_font(&mut self) {
+        if self.font_stack.len() > 1 {
+            self.font_stack.pop();
         }
     }
 
@@ -167,7 +190,11 @@ fn parse_column(tokenizer: &mut Tokenizer) -> Result<Box<dyn Element>> {
     }
 
     if factors.is_empty() {
-        return Err(format!("No COLUMN at {}", tokenizer.position_info()).into());
+        return Err(format!(
+            "No effective elements in COLUMN at {}",
+            tokenizer.position_info()
+        )
+        .into());
     }
 
     create_column_element(factors)
@@ -191,7 +218,8 @@ fn parse_factor(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     }
 }
 
-/// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | GAP_ELEMENT | BOX_ELEMENT | TXT_ELEMENT
+/// Parse ELEMENT := BAR_ELEMENT | IMG_ELEMENT | QRC_ELEMENT | GAP_ELEMENT | BOX_ELEMENT
+///                  | TXT_ELEMENT
 fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> {
     if let Some(token) = tokenizer.peek() {
         if let Some(content) = token.strip_prefix("bar:") {
@@ -217,6 +245,12 @@ fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> 
             tokenizer.consume();
             let box_element = Gap::parse(&content, true)?;
             Ok(Some(Box::new(box_element)))
+        } else if let Some(content) = token.strip_prefix("fnt:") {
+            let content = content.to_string();
+            tokenizer.consume();
+            parse_font_element(tokenizer, &content)?;
+            // Font operation is side-effect only, parse next element recursively
+            parse_element(tokenizer)
         } else {
             // Parse TXT_ELEMENT (handles stopping conditions internally)
             parse_txt_element(tokenizer)
@@ -237,6 +271,7 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element
             || token.starts_with("qrc:")
             || token.starts_with("gap:")
             || token.starts_with("box:")
+            || token.starts_with("fnt:")
             || token == "+"
             || token == "/"
             || token == "["
@@ -257,10 +292,7 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element
         return Ok(None);
     }
 
-    Ok(Some(Box::new(Text::new(
-        &texts,
-        tokenizer.text_options.clone(),
-    )?)))
+    Ok(Some(Box::new(Text::new(&texts, tokenizer.current_font())?)))
 }
 
 /// Create Row element or return single element if columns.len() == 1
@@ -270,7 +302,7 @@ fn create_row_element(
 ) -> Result<Box<dyn Element>> {
     let mut columns = columns;
     match columns.len() {
-        0 => Err("No columns found".into()),
+        0 => Err("No effective columns found".into()),
         1 => Ok(columns.pop().unwrap()),
         _ => Ok(Box::new(Row::new(columns, row_options))),
     }
@@ -280,7 +312,7 @@ fn create_row_element(
 fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Element>> {
     let mut elements = elements;
     match elements.len() {
-        0 => Err("No elements found".into()),
+        0 => Err("No effective elements found".into()),
         1 => Ok(elements.pop().unwrap()),
         _ => Ok(Box::new(Column::new(elements, 20.0))), // FIXME: 360DPI
     }
@@ -290,8 +322,64 @@ fn create_column_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Elem
 fn create_overlay_element(elements: Vec<Box<dyn Element>>) -> Result<Box<dyn Element>> {
     let mut elements = elements;
     match elements.len() {
-        0 => Err("No rows found".into()),
+        0 => Err("No effective rows found".into()),
         1 => Ok(elements.pop().unwrap()),
         _ => Ok(Box::new(Overlay::new(elements))),
     }
+}
+
+/// Parse font operation and update tokenizer font stack
+fn parse_font_element(tokenizer: &mut Tokenizer, spec: &str) -> Result<()> {
+    match spec {
+        "pop" => {
+            tokenizer.pop_font();
+        }
+        "default" => {
+            let default_font = tokenizer.default_font();
+            tokenizer.push_font(default_font);
+        }
+        _ => {
+            let font = parse_font_spec(&tokenizer.current_font(), spec)?;
+            tokenizer.push_font(font);
+        }
+    }
+    Ok(())
+}
+
+/// Parse font specification and create new TextOptions
+fn parse_font_spec(base_font: &TextOptions, spec: &str) -> Result<TextOptions> {
+    let mut font = base_font.clone();
+    let args: Vec<&str> = spec.split(':').collect();
+
+    if args.is_empty() {
+        return Err("Empty font specification".into());
+    }
+
+    // Font name if specified (non-empty)
+    if let Some(name) = args.first()
+        && !name.is_empty()
+    {
+        font.font_name = name.to_string();
+    }
+
+    // Font size if specified
+    if let Some(size) = args.get(1)
+        && !size.is_empty()
+    {
+        font.font_size = size
+            .parse()
+            .map_err(|_| format!("Invalid font size: {}", size))?;
+        font.line_height = font.font_size; // Reset line height to match size
+    }
+
+    // Line height if specified
+    if let Some(line_height) = args.get(2)
+        && !line_height.is_empty()
+    {
+        font.line_height = line_height
+            .parse()
+            .map_err(|_| format!("Invalid line height: {}", line_height))?;
+    }
+
+    Ok(font)
 }
