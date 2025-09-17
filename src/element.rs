@@ -192,6 +192,7 @@ impl Element for Text {
     fn bounding_box(&self) -> Result<BoundingBox> {
         calculate_text_bbox(
             &self.options.font_name,
+            &self.options.font_weight,
             self.options.font_size,
             self.options.line_height,
             &self.texts,
@@ -202,6 +203,7 @@ impl Element for Text {
     fn render(&self) -> Result<svge::Group> {
         let text_element = create_text_element(
             &self.options.font_name,
+            &self.options.font_weight,
             self.options.font_size,
             self.options.line_height,
             &self.texts,
@@ -218,12 +220,14 @@ impl Display for Text {
 
 fn create_text_element(
     font_name: &str,
+    font_weight: &str,
     font_size: u32,
     line_height: u32,
     texts: &[String],
 ) -> svge::Text {
     let mut text = svge::Text::new("")
         .set("font-family", font_name)
+        .set("font-weight", font_weight)
         .set("font-size", font_size)
         .set("fill", "black")
         .set("text-anchor", "start")
@@ -279,6 +283,7 @@ fn validate_font(font_name: &str, fontdb: &Database) -> Result<()> {
 
 fn calculate_text_bbox(
     font_name: &str,
+    font_weight: &str,
     font_size: u32,
     line_height: u32,
     texts: &[String],
@@ -291,7 +296,7 @@ fn calculate_text_bbox(
     let vw = max_line_length * font_size as usize + 500;
     let vh = line_count * font_size as usize + 500;
 
-    let txt = create_text_element(font_name, font_size, line_height, texts);
+    let txt = create_text_element(font_name, font_weight, font_size, line_height, texts);
     let doc = svg::Document::new()
         .set("viewBox", (0, 0, vw, vh))
         .set("xmlns", "http://www.w3.org/2000/svg")
