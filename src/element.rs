@@ -254,10 +254,23 @@ fn calculate_text_bbox(
     Ok(result)
 }
 
-pub fn render_svg_to_pixmap(svg_data: &str, fontdb: &Arc<Database>) -> Result<tiny_skia::Pixmap> {
-    let options = usvg::Options {
-        fontdb: fontdb.clone(),
-        ..Default::default()
+pub fn render_svg_to_pixmap(
+    svg_data: &str,
+    fontdb: &Arc<Database>,
+    enable_antialiasing: bool,
+) -> Result<tiny_skia::Pixmap> {
+    let options = if enable_antialiasing {
+        usvg::Options {
+            fontdb: fontdb.clone(),
+            ..Default::default()
+        }
+    } else {
+        usvg::Options {
+            fontdb: fontdb.clone(),
+            text_rendering: usvg::TextRendering::OptimizeSpeed,
+            shape_rendering: usvg::ShapeRendering::CrispEdges,
+            ..Default::default()
+        }
     };
 
     let tree = usvg::Tree::from_str(svg_data, &options)?;
@@ -289,10 +302,23 @@ pub fn render_svg_to_pixmap(svg_data: &str, fontdb: &Arc<Database>) -> Result<ti
 // purposes.
 //
 #[allow(dead_code)]
-fn calculate_text_logical_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<BoundingBox> {
-    let options = usvg::Options {
-        fontdb: fontdb.clone(),
-        ..Default::default()
+fn calculate_text_logical_bbox(
+    svg_data: &str,
+    fontdb: &Arc<Database>,
+    enable_antialiasing: bool,
+) -> Result<BoundingBox> {
+    let options = if enable_antialiasing {
+        usvg::Options {
+            fontdb: fontdb.clone(),
+            ..Default::default()
+        }
+    } else {
+        usvg::Options {
+            fontdb: fontdb.clone(),
+            text_rendering: usvg::TextRendering::OptimizeSpeed,
+            shape_rendering: usvg::ShapeRendering::CrispEdges,
+            ..Default::default()
+        }
     };
 
     let tree = usvg::Tree::from_str(svg_data, &options)?;
@@ -317,7 +343,7 @@ fn calculate_text_logical_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result
 
 fn calculate_pixel_bbox(svg_data: &str, fontdb: &Arc<Database>) -> Result<BoundingBox> {
     // Use shared rendering logic
-    let pixmap = render_svg_to_pixmap(svg_data, fontdb)?;
+    let pixmap = render_svg_to_pixmap(svg_data, fontdb, false)?;
 
     // Find actual pixel bounds (like ImageMagick's %@)
     let pixels = pixmap.data();

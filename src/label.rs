@@ -53,7 +53,7 @@ impl Label {
     /// Create PNG data
     pub fn to_png(&self) -> Result<Vec<u8>> {
         let svg_data = self.to_svg()?;
-        let pixmap = render_svg_to_pixmap(&svg_data, &self.options.fontdb)?;
+        let pixmap = render_svg_to_pixmap(&svg_data, &self.options.fontdb, false)?;
         Ok(pixmap.encode_png()?)
     }
 
