@@ -153,7 +153,7 @@
    The =fnt:= prefix allows dynamic font changes.
    They have no visual representation themselves and only affect text elements that follow them.
    Font specification format:
-   + =fnt:NAME:SIZE:HEIGHT= : Set font name, size, and line height.
+   + =fnt:NAME:WEIGHT:SIZE:HEIGHT= : Set font name, weight, size, and line height.
      Any part can be left blank.
    + =fnt:default= : Reset to default font settings
    + =fnt:pop= : Restore previous font settings (from font stack)
