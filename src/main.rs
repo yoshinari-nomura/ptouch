@@ -12,7 +12,10 @@ use ptouch::layout;
 use ptouch::printable_image::PrintableImage;
 use ptouch::printer::Printer;
 use ptouch::tape::{self, Tape, TapeSpec};
-use ptouch::{Result, get_font_names, load_fontdb_with_paths, unescape_shell_string};
+use ptouch::{
+    Result, get_font_names, load_fontdb_with_paths, parse_font_name_and_weight,
+    unescape_shell_string,
+};
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
 #[clap(rename_all = "lowercase")]
@@ -271,10 +274,13 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     // Create fontdb from font paths
     let fontdb = load_fontdb_with_paths(&args.font_paths)?;
 
+    // Parse font name and weight from font argument
+    let (font_name, font_weight) = parse_font_name_and_weight(&args.font);
+
     // Create text options for layout parsing
     let text_options = TextOptions {
-        font_name: args.font,
-        font_weight: "normal".to_string(),
+        font_name,
+        font_weight,
         font_size: args.font_size,
         line_height: args.line_height.unwrap_or(args.font_size),
     };

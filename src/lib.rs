@@ -139,3 +139,55 @@ pub fn get_font_names(font_paths: &[PathBuf]) -> Vec<String> {
     names.sort();
     names
 }
+
+/// Parse font name and weight from a font specification string
+///
+/// Supports formats like:
+/// - "Noto Sans CJK JP" -> ("Noto Sans CJK JP", "normal")
+/// - "Noto Sans CJK JP Bold" -> ("Noto Sans CJK JP", "bold")
+/// - "Arial Black" -> ("Arial", "black")
+/// - "Liberation Sans Italic" -> ("Liberation Sans", "italic")
+///
+/// # Arguments
+/// * `font_spec` - Font specification string
+///
+/// # Returns
+/// * Tuple of (font_name, font_weight)
+pub fn parse_font_name_and_weight(font_spec: &str) -> (String, String) {
+    let weights = [
+        " thin",
+        " extralight",
+        " ultralight",
+        " light",
+        " semilight",
+        " demilight",
+        " regular",
+        " normal",
+        " medium",
+        " semibold",
+        " demibold",
+        " bold",
+        " extrabold",
+        " ultrabold",
+        " heavy",
+        " black",
+        " extrablack",
+        " ultrablack",
+        " italic",
+        " oblique",
+    ];
+
+    for weight_with_space in &weights {
+        if let Some(pos) = font_spec.to_lowercase().rfind(weight_with_space) {
+            let font_name = font_spec[..pos].to_string();
+            let weight = weight_with_space.trim().to_string();
+
+            if !font_name.is_empty() {
+                return (font_name, weight);
+            }
+        }
+    }
+
+    // No weight found, return entire string as font name
+    (font_spec.to_string(), "normal".to_string())
+}
