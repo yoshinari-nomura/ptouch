@@ -358,38 +358,19 @@ fn parse_font_element(tokenizer: &mut Tokenizer, spec: &str) -> Result<()> {
 
 /// Parse font specification and create new TextOptions
 fn parse_font_spec(base_font: &TextOptions, spec: &str) -> Result<TextOptions> {
-    let mut font = base_font.clone();
-    let args: Vec<&str> = spec.split(':').collect();
+    let base_string = base_font.to_string();
+    let base_parts: Vec<&str> = base_string.split(':').collect();
+    let spec_parts: Vec<&str> = spec.split(':').collect();
 
-    if args.is_empty() {
-        return Err("Empty font specification".into());
-    }
+    let merged_spec = (0..4)
+        .map(|i| {
+            *spec_parts
+                .get(i)
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&base_parts[i])
+        })
+        .collect::<Vec<&str>>()
+        .join(":");
 
-    // Font name if specified (non-empty)
-    if let Some(name) = args.first()
-        && !name.is_empty()
-    {
-        font.font_name = name.to_string();
-    }
-
-    // Font size if specified
-    if let Some(size) = args.get(1)
-        && !size.is_empty()
-    {
-        font.font_size = size
-            .parse()
-            .map_err(|_| format!("Invalid font size: {}", size))?;
-        font.line_height = font.font_size; // Reset line height to match size
-    }
-
-    // Line height if specified
-    if let Some(line_height) = args.get(2)
-        && !line_height.is_empty()
-    {
-        font.line_height = line_height
-            .parse()
-            .map_err(|_| format!("Invalid line height: {}", line_height))?;
-    }
-
-    Ok(font)
+    merged_spec.parse()
 }

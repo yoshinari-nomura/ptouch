@@ -274,6 +274,7 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     // Create text options for layout parsing
     let text_options = TextOptions {
         font_name: args.font,
+        font_weight: "normal".to_string(),
         font_size: args.font_size,
         line_height: args.line_height.unwrap_or(args.font_size),
     };

@@ -3,6 +3,7 @@ use fontdb::Database;
 use qrcode;
 use resvg::{tiny_skia, usvg};
 use std::fmt::{self, Display};
+use std::str::FromStr;
 use std::sync::Arc;
 use svg::node::element as svge;
 
@@ -117,8 +118,56 @@ pub trait Element: Display {
 #[derive(Clone)]
 pub struct TextOptions {
     pub font_name: String,
+    pub font_weight: String,
     pub font_size: u32,
     pub line_height: u32,
+}
+
+impl Display for TextOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}:{}",
+            self.font_name, self.font_weight, self.font_size, self.line_height
+        )
+    }
+}
+
+impl FromStr for TextOptions {
+    type Err = Box<dyn std::error::Error>;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split(':').collect();
+
+        if parts.len() != 4 {
+            return Err(format!("Invalid font spec format {}", parts.len()).into());
+        }
+
+        let font_name = parts[0];
+        if font_name.is_empty() {
+            return Err("Font name cannot be empty".into());
+        }
+
+        let font_weight = parts[1];
+        if font_weight.is_empty() {
+            return Err("Font weight cannot be empty".into());
+        }
+
+        let font_size = parts[2]
+            .parse::<u32>()
+            .map_err(|_| format!("Invalid font size: '{}'", parts[2]))?;
+
+        let line_height = parts[3]
+            .parse::<u32>()
+            .map_err(|_| format!("Invalid line height: '{}'", parts[3]))?;
+
+        Ok(TextOptions {
+            font_name: font_name.to_string(),
+            font_weight: font_weight.to_string(),
+            font_size,
+            line_height,
+        })
+    }
 }
 
 pub struct Text {

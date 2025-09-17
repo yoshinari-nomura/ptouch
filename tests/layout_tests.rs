@@ -3,17 +3,20 @@ use ptouch::element::{RowOptions, TextOptions, VerticalAlign};
 use ptouch::layout::parse_layout_script;
 use std::sync::Arc;
 
-fn create_test_options() -> TextOptions {
+fn create_test_options() -> (TextOptions, Arc<Database>) {
     let mut fontdb = Database::new();
     fontdb.load_fonts_dir("attic/fonts");
     fontdb.load_system_fonts();
+    let fontdb = Arc::new(fontdb);
 
-    TextOptions {
+    let text_options = TextOptions {
         font_name: "Noto Sans JP".to_string(),
+        font_weight: "normal".to_string(),
         font_size: 24,
         line_height: 30,
-        fontdb: Arc::new(fontdb),
-    }
+    };
+
+    (text_options, fontdb)
 }
 
 fn create_test_row_options() -> RowOptions {
@@ -29,9 +32,9 @@ fn script_from_str(input: &str) -> Vec<String> {
 
 fn parse_test_script(input: &str) -> ptouch::Result<Box<dyn ptouch::element::Element>> {
     let script = script_from_str(input);
-    let options = create_test_options();
+    let (options, fontdb) = create_test_options();
     let row_options = create_test_row_options();
-    parse_layout_script(&script, &options, &row_options)
+    parse_layout_script(&script, &options, &row_options, fontdb)
 }
 
 fn assert_parse_result(input: &str, expected: &str) {
@@ -460,17 +463,17 @@ fn test_font_default_and_pop() {
 #[test]
 fn test_invalid_font_size() {
     // Invalid font size should error
-    let result = parse_test_script("fnt:Arial:invalid Hello");
+    let result = parse_test_script("fnt:Arial:normal:invalid:30 Hello");
     assert!(result.is_err());
     let error_msg = format!("{}", result.err().unwrap());
-    assert!(error_msg.contains("Invalid font size: invalid"));
+    assert!(error_msg.contains("Invalid font size: 'invalid'"));
 }
 
 #[test]
 fn test_invalid_line_height() {
     // Invalid line height should error
-    let result = parse_test_script("fnt:Arial:16:invalid Hello");
+    let result = parse_test_script("fnt:Arial:normal:16:invalid Hello");
     assert!(result.is_err());
     let error_msg = format!("{}", result.err().unwrap());
-    assert!(error_msg.contains("Invalid line height: invalid"));
+    assert!(error_msg.contains("Invalid line height: 'invalid'"));
 }
