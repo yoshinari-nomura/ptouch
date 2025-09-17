@@ -119,21 +119,22 @@ pub struct TextOptions {
     pub font_name: String,
     pub font_size: u32,
     pub line_height: u32,
-    pub fontdb: Arc<Database>,
 }
 
 pub struct Text {
     options: TextOptions,
     texts: Vec<String>,
+    fontdb: Arc<Database>,
 }
 
 impl Text {
-    pub fn new(texts: &[String], options: TextOptions) -> Result<Self> {
-        validate_font(&options.font_name, &options.fontdb)?;
+    pub fn new(texts: &[String], options: TextOptions, fontdb: Arc<Database>) -> Result<Self> {
+        validate_font(&options.font_name, &fontdb)?;
 
         Ok(Text {
             options,
             texts: texts.to_vec(),
+            fontdb,
         })
     }
 }
@@ -145,7 +146,7 @@ impl Element for Text {
             self.options.font_size,
             self.options.line_height,
             &self.texts,
-            &self.options.fontdb,
+            &self.fontdb,
         )
     }
 

@@ -276,7 +276,6 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
         font_name: args.font,
         font_size: args.font_size,
         line_height: args.line_height.unwrap_or(args.font_size),
-        fontdb: fontdb.clone(),
     };
 
     // Create label options (simplified)
@@ -287,7 +286,7 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     let row_padding = tape_spec.mm_to_dots(1.4) as f32;
 
     let label_options = LabelOptions {
-        fontdb,
+        fontdb: fontdb.clone(),
         tape_spec,
         auto_scale: args.auto_scale,
         rotate: args.rotate,
@@ -302,7 +301,7 @@ fn handle_image_command(args: ImageArgs) -> Result<()> {
     };
 
     // Create label using layout script parsing
-    let element = layout::parse_layout_script(&texts, &text_options, &row_options)?;
+    let element = layout::parse_layout_script(&texts, &text_options, &row_options, fontdb)?;
     let label = Label::from_element(element, label_options);
 
     if args.source {

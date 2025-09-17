@@ -1,5 +1,7 @@
 use crate::Result;
 use crate::element::{Column, Element, Gap, Overlay, QrCode, Row, RowOptions, Text, TextOptions};
+use fontdb::Database;
+use std::sync::Arc;
 
 /// Parse layout script DSL into Element tree
 ///
@@ -50,13 +52,14 @@ pub fn parse_layout_script(
     script: &[String],
     text_options: &TextOptions,
     row_options: &RowOptions,
+    fontdb: Arc<Database>,
 ) -> Result<Box<dyn Element>> {
     if script.is_empty() {
         return Err("Empty layout script".into());
     }
 
     let tokens: Vec<&str> = script.iter().map(|s| s.as_str()).collect();
-    let mut tokenizer = Tokenizer::new(tokens, text_options, row_options);
+    let mut tokenizer = Tokenizer::new(tokens, text_options, row_options, fontdb);
     let overlay = parse_overlay(&mut tokenizer)?;
 
     // Check for unconsumed tokens (like unmatched ']')
@@ -73,6 +76,7 @@ struct Tokenizer<'a> {
     position: usize,
     font_stack: Vec<TextOptions>,
     row_options: &'a RowOptions,
+    fontdb: Arc<Database>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -80,12 +84,14 @@ impl<'a> Tokenizer<'a> {
         tokens: Vec<&'a str>,
         text_options: &'a TextOptions,
         row_options: &'a RowOptions,
+        fontdb: Arc<Database>,
     ) -> Self {
         Self {
             tokens,
             position: 0,
             font_stack: vec![text_options.clone()],
             row_options,
+            fontdb,
         }
     }
 
@@ -292,7 +298,11 @@ fn parse_txt_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element
         return Ok(None);
     }
 
-    Ok(Some(Box::new(Text::new(&texts, tokenizer.current_font())?)))
+    Ok(Some(Box::new(Text::new(
+        &texts,
+        tokenizer.current_font(),
+        tokenizer.fontdb.clone(),
+    )?)))
 }
 
 /// Create Row element or return single element if columns.len() == 1
