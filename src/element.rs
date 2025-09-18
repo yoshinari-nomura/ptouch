@@ -1,8 +1,10 @@
 use crate::Result;
 use fontdb::Database;
+use png;
 use qrcode;
 use resvg::{tiny_skia, usvg};
 use std::fmt::{self, Display};
+use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
 use svg::node::element as svge;
@@ -842,4 +844,88 @@ impl Display for Overlay {
         let layers: Vec<String> = self.elements.iter().map(|e| format!("{}", e)).collect();
         write!(f, "Overlay({})", layers.join(","))
     }
+}
+
+pub struct Image {
+    href: String,
+    req_width: Option<f32>,
+    req_height: Option<f32>,
+    src_width: u32,
+    src_height: u32,
+}
+
+impl Image {
+    pub fn new(href: String, req_width: Option<f32>, req_height: Option<f32>) -> Result<Self> {
+        let (src_width, src_height) = read_png_dimensions(&href)?;
+
+        Ok(Image {
+            href,
+            req_width,
+            req_height,
+            src_width,
+            src_height,
+        })
+    }
+
+    fn width(&self) -> f32 {
+        let aspect_ratio = self.src_width as f32 / self.src_height as f32;
+
+        match (self.req_width, self.req_height) {
+            (Some(w), _) => w,                     // Width specified
+            (None, Some(h)) => h * aspect_ratio,   // Height only, calculate width
+            (None, None) => self.src_width as f32, // Original size
+        }
+    }
+
+    fn height(&self) -> f32 {
+        let aspect_ratio = self.src_width as f32 / self.src_height as f32;
+
+        match (self.req_width, self.req_height) {
+            (_, Some(h)) => h,                      // Height specified
+            (Some(w), None) => w / aspect_ratio,    // Width only, calculate height
+            (None, None) => self.src_height as f32, // Original size
+        }
+    }
+}
+
+impl Element for Image {
+    fn bounding_box(&self) -> Result<BoundingBox> {
+        Ok(BoundingBox {
+            width: self.width(),
+            height: self.height(),
+            x: 0.0,
+            y: 0.0,
+        })
+    }
+
+    fn render(&self) -> Result<svge::Group> {
+        let image = svge::Image::new()
+            .set("href", self.href.as_str())
+            .set("width", self.width())
+            .set("height", self.height())
+            .set("preserveAspectRatio", "none")
+            .set("x", 0)
+            .set("y", 0);
+
+        Ok(enclose_group(image))
+    }
+}
+
+impl Display for Image {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Image({})", self.href)
+    }
+}
+
+fn read_png_dimensions(file_path: &str) -> Result<(u32, u32)> {
+    let file = File::open(file_path)
+        .map_err(|e| format!("Failed to open image file '{}': {}", file_path, e))?;
+
+    let decoder = png::Decoder::new(file);
+    let reader = decoder
+        .read_info()
+        .map_err(|e| format!("Failed to read PNG info from '{}': {}", file_path, e))?;
+
+    let info = reader.info();
+    Ok((info.width, info.height))
 }

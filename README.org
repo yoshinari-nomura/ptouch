@@ -143,12 +143,15 @@
    + =gap:= prefix: Gap element (for layout spacing)
    + =box:= prefix: Visible Gap element (for thin lines)
    + =bar:= prefix: Barcode element (not implemented)
-   + =img:= prefix: Image element (not implemented)
+   + =img:= prefix: Image element
    + =fnt:= prefix: Font operation element
 
    Gap elements can be used to fine-tune spacing between elements:
    + =gap:10= : 10x10 square gap
    + =gap:20x5= : Rectangle gap of width 20, height 5
+
+   Image elements (img) insert images in the format =img:file.png:width:height=.
+   The =width:height= is optional, and if only one is specified, it scales while preserving the aspect ratio.
 
    The =fnt:= prefix allows dynamic font changes.
    They have no visual representation themselves and only affect text elements that follow them.

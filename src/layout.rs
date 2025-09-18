@@ -1,5 +1,7 @@
 use crate::Result;
-use crate::element::{Column, Element, Gap, Overlay, QrCode, Row, RowOptions, Text, TextOptions};
+use crate::element::{
+    Column, Element, Gap, Image, Overlay, QrCode, Row, RowOptions, Text, TextOptions,
+};
 use fontdb::Database;
 use std::sync::Arc;
 
@@ -235,7 +237,7 @@ fn parse_element(tokenizer: &mut Tokenizer) -> Result<Option<Box<dyn Element>>> 
         } else if let Some(content) = token.strip_prefix("img:") {
             let content = content.to_string();
             tokenizer.consume();
-            Err(format!("Image not yet implemented: {}", content).into())
+            parse_img_element(&content)
         } else if let Some(content) = token.strip_prefix("qrc:") {
             let content = content.to_string();
             tokenizer.consume();
@@ -373,4 +375,35 @@ fn parse_font_spec(base_font: &TextOptions, spec: &str) -> Result<TextOptions> {
         .join(":");
 
     merged_spec.parse()
+}
+
+/// Parse img:filename:width:height element
+fn parse_img_element(spec: &str) -> Result<Option<Box<dyn Element>>> {
+    let parts: Vec<&str> = spec.split(':').collect();
+
+    if parts.is_empty() {
+        return Err("Empty image specification".into());
+    }
+
+    let filename = parts[0];
+    if filename.is_empty() {
+        return Err("Image filename cannot be empty".into());
+    }
+
+    let req_width = parts
+        .get(1)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<f32>())
+        .transpose()
+        .map_err(|_| format!("Invalid width: '{}'", parts.get(1).unwrap_or(&"")))?;
+
+    let req_height = parts
+        .get(2)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<f32>())
+        .transpose()
+        .map_err(|_| format!("Invalid height: '{}'", parts.get(2).unwrap_or(&"")))?;
+
+    let image = Image::new(filename.to_string(), req_width, req_height)?;
+    Ok(Some(Box::new(image)))
 }
