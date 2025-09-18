@@ -124,6 +124,7 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     // Add white background for the entire label
     document = document.add(
         svg::node::element::Rectangle::new()
+            .set("class", "background")
             .set("x", 0)
             .set("y", 0)
             .set("width", vw.round() as u32)
@@ -136,6 +137,7 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     // Add debug bounding box (at original bbox position, will be moved by same transform)
     if options.debug {
         let bbox_rect = svg::node::element::Rectangle::new()
+            .set("class", "debug")
             .set("x", bbox.x as i32)
             .set("y", bbox.y as i32)
             .set("width", bbox.width as u32)
@@ -149,6 +151,7 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     // Add rotation if enabled
     if options.rotate {
         content_group = svg::node::element::Group::new()
+            .set("class", "rotate")
             .set("x", 0)
             .set("y", 0)
             .set(
@@ -161,12 +164,14 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     // Add scaling if auto-scale is enabled
     if options.auto_scale {
         content_group = svg::node::element::Group::new()
+            .set("class", "auto-scale")
             .set("transform", format!("scale({})", scale))
             .add(content_group);
     }
 
     // Create main group with translation
     let main_group = svg::node::element::Group::new()
+        .set("class", "vertical-align")
         .set("transform", format!("translate(0, {})", y_offset))
         .add(content_group);
     document = document.add(main_group);
@@ -176,6 +181,7 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
     document = document
         .add(
             svg::node::element::Rectangle::new()
+                .set("class", "margin")
                 .set("x", 0)
                 .set("y", 0)
                 .set("width", vw.round() as u32)
@@ -184,6 +190,7 @@ fn create_label_svg_from_element(element: &dyn Element, options: &LabelOptions) 
         )
         .add(
             svg::node::element::Rectangle::new()
+                .set("class", "margin")
                 .set("x", 0)
                 .set("y", (ch + m) as u32)
                 .set("width", vw.round() as u32)

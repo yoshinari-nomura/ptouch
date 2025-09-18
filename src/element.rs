@@ -103,6 +103,15 @@ pub trait Element: Display {
         true
     }
 
+    /// Return the type name of this element
+    fn type_name(&self) -> String {
+        let s = format!("{}", self);
+        match s.find('(') {
+            Some(pos) => s[..pos].to_string(),
+            None => s,
+        }
+    }
+
     /// Render this element at a specific position with proper coordinate transformation
     fn render_at(&self, x: f32, y: f32) -> Result<svge::Group> {
         let bbox = self.bounding_box()?;
@@ -111,7 +120,7 @@ pub trait Element: Display {
         // Combine bbox correction (-bbox.x, -bbox.y) and position placement (x, y)
         let tr = format!("translate({}, {})", x - bbox.x, y - bbox.y);
 
-        Ok(group.set("transform", tr))
+        Ok(group.set("transform", tr).set("class", self.type_name()))
     }
 }
 
