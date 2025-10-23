@@ -165,7 +165,7 @@
 *** Basic Text Placement (top, bottom, center, auto-scale)
     + In the following examples, the =-d= option is used to visualize non-printable areas and bounding boxes.
       For actual printing images, you need to create without the =-d= option.
-    + Tape width and font size are the defaults: 12mm (-t 12) and 24px (-f 24).
+    + Tape width and font size are the defaults: 12mm (-t 12) and 24px (-s 24).
     + Default values for each option can be checked with =ptouch image --help=.
 
     + top
