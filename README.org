@@ -215,6 +215,16 @@
     #+ATTR_HTML: :height 85px
     [[file:images/pcb-connector-r.png]]
 
+*** Complex Example Using Layers
+    #+begin_src bash :results silent
+      cat images/buppin-layered-demo.txt| ptouch image -a -l40 -t36 -o images/buppin-layered-demo.png
+    #+end_src
+    Code:
+    [[file:images/buppin-layered-demo.txt]]
+
+    #+ATTR_HTML: :height 256px
+    [[file:images/buppin-layered-demo.png]]
+
 * Installation
   #+begin_src bash
     git clone https://github.com/yoshinari-nomura/ptouch.git

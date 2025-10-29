@@ -1,0 +1,53 @@
+gap:3x0
++
+gap:670x0
+box:660x3
+gap:1x37
+box:660x3
+gap:1x37
+box:660x3
+gap:1x37
+box:660x3
+gap:1x37
+box:660x3
+gap:1x37
+box:660x3
+gap:1x77
+box:660x3
+gap:1x37
+box:660x3
+/
+gap:3x0
++
+box:3x323
++
+gap:130x0
++
+box:3x323
++
+gap:524x0
++
+box:3x323
+/
+gap:1x10
+　　　　　　　　　　　満帆商事 株式会社
+  部門
+  資産番号
+  取得年月日
+  品名
+  規格
+
+  管理担当者
+/
+gap:1x48
+[
+gap:143x0
++
+総務部 庶務 二課
+TN25000000000878-001
+2025年09月11日
+ノートPC
+満帆電気 PC-6800 DX2-HD XVI SUPER S/N:
+R12-34007
+江角マキコ
+]
